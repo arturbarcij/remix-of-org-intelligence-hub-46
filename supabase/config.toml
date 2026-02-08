@@ -2,3 +2,6 @@ project_id = "kzbtmjqektdlqklnsqpd"
 
 [functions.elevenlabs-scribe-token]
 verify_jwt = false
+
+[functions.classify-signal]
+verify_jwt = false
