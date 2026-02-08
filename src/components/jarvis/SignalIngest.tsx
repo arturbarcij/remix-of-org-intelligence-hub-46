@@ -2,13 +2,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Signal } from "@/lib/api";
 import { MessageSquare, Mic, Image, Mail } from "lucide-react";
 import VoiceInput from "./VoiceInput";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 interface SignalIngestProps {
   signals: Signal[];
   selectedSignal: Signal | null;
   onSignalSelect: (signal: Signal) => void;
   onVoiceTranscript?: (text: string) => Promise<Signal>;
+  onTextSubmit?: (payload: { content: string; title?: string; source?: string; type?: Signal["type"] }) => Promise<Signal>;
   isProcessing?: boolean;
 }
 
@@ -26,7 +27,20 @@ const typeLabels = {
   email: "Email Thread",
 };
 
-export default function SignalIngest({ signals, selectedSignal, onSignalSelect, onVoiceTranscript, isProcessing }: SignalIngestProps) {
+export default function SignalIngest({
+  signals,
+  selectedSignal,
+  onSignalSelect,
+  onVoiceTranscript,
+  onTextSubmit,
+  isProcessing,
+}: SignalIngestProps) {
+  const [textContent, setTextContent] = useState("");
+  const [textTitle, setTextTitle] = useState("");
+  const [textSource, setTextSource] = useState("");
+  const [textType, setTextType] = useState<Signal["type"]>("slack");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleVoiceTranscript = useCallback(async (text: string) => {
     if (onVoiceTranscript) {
       const voiceSignal = await onVoiceTranscript(text);
@@ -44,6 +58,26 @@ export default function SignalIngest({ signals, selectedSignal, onSignalSelect, 
     }
   }, [onSignalSelect, onVoiceTranscript]);
 
+  const handleTextSubmit = useCallback(async () => {
+    if (!onTextSubmit || !textContent.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const saved = await onTextSubmit({
+        content: textContent.trim(),
+        title: textTitle.trim() || "Manual Ingest",
+        source: textSource.trim() || "User Input",
+        type: textType,
+      });
+      onSignalSelect(saved);
+      setTextContent("");
+      setTextTitle("");
+      setTextSource("");
+      setTextType("slack");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [isSubmitting, onTextSubmit, onSignalSelect, textContent, textSource, textTitle, textType]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -52,6 +86,53 @@ export default function SignalIngest({ signals, selectedSignal, onSignalSelect, 
           <p className="text-xs text-muted-foreground">Select a signal or use voice input {isProcessing && "(processing…)"}</p>
         </div>
         <VoiceInput onTranscript={handleVoiceTranscript} disabled={isProcessing} />
+      </div>
+
+      {/* Manual ingest */}
+      <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            value={textTitle}
+            onChange={(e) => setTextTitle(e.target.value)}
+            placeholder="Title (optional)"
+            className="flex-1 text-xs bg-secondary/40 border border-border rounded px-2 py-1.5 text-foreground placeholder:text-muted-foreground/60 outline-none"
+          />
+          <input
+            value={textSource}
+            onChange={(e) => setTextSource(e.target.value)}
+            placeholder="Source (optional)"
+            className="flex-1 text-xs bg-secondary/40 border border-border rounded px-2 py-1.5 text-foreground placeholder:text-muted-foreground/60 outline-none"
+          />
+          <select
+            value={textType}
+            onChange={(e) => setTextType(e.target.value as Signal["type"])}
+            className="text-xs bg-secondary/40 border border-border rounded px-2 py-1.5 text-foreground"
+          >
+            <option value="slack">Slack</option>
+            <option value="meeting">Meeting</option>
+            <option value="email">Email</option>
+            <option value="screenshot">Screenshot</option>
+          </select>
+        </div>
+        <textarea
+          value={textContent}
+          onChange={(e) => setTextContent(e.target.value)}
+          placeholder="Paste a message, meeting notes, or decision here..."
+          rows={3}
+          className="w-full text-xs bg-secondary/40 border border-border rounded px-2 py-2 text-foreground placeholder:text-muted-foreground/60 outline-none resize-none"
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">
+            This will create a new signal and run the pipeline.
+          </span>
+          <button
+            onClick={handleTextSubmit}
+            disabled={!textContent.trim() || isSubmitting || isProcessing}
+            className="text-[11px] px-2.5 py-1 rounded-md bg-primary text-primary-foreground disabled:opacity-40"
+          >
+            {isSubmitting ? "Adding..." : "Add Signal"}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

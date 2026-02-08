@@ -136,6 +136,32 @@ export function usePipeline() {
     [apiLive]
   );
 
+  const addSignalFromText = useCallback(
+    async (payload: { content: string; title?: string; source?: string; type?: Signal["type"] }): Promise<Signal> => {
+      const textSignal: Signal = {
+        id: `text-${Date.now()}`,
+        type: payload.type || "slack",
+        title: payload.title || "Manual Ingest",
+        source: payload.source || "User Input",
+        timestamp: "Just now",
+        content: payload.content,
+      };
+      if (apiLive) {
+        try {
+          const saved = await api.addSignal(textSignal);
+          setSignals((prev) => [...prev.filter((s) => s.id !== saved.id), saved]);
+          return saved;
+        } catch {
+          setSignals((prev) => [...prev, textSignal]);
+          return textSignal;
+        }
+      }
+      setSignals((prev) => [...prev, textSignal]);
+      return textSignal;
+    },
+    [apiLive]
+  );
+
   return {
     apiLive,
     signals,
@@ -146,5 +172,6 @@ export function usePipeline() {
     submitQuery,
     isQuerying,
     addSignalFromVoice,
+    addSignalFromText,
   };
 }

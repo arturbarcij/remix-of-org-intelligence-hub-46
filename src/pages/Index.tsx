@@ -30,6 +30,7 @@ export default function Index() {
     submitQuery,
     isQuerying,
     addSignalFromVoice,
+    addSignalFromText,
     apiLive,
   } = usePipeline();
 
@@ -497,6 +498,7 @@ export default function Index() {
                 selectedSignal={selectedSignal}
                 onSignalSelect={handleSignalSelect}
                 onVoiceTranscript={addSignalFromVoice}
+                onTextSubmit={addSignalFromText}
                 isProcessing={isProcessing}
               />
 
