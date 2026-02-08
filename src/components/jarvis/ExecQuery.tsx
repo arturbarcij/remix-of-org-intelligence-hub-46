@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { execQueryResponse, QueryResponse } from "@/data/mockData";
 import { useStreamText } from "@/hooks/useStreamText";
-import { Search, ArrowRight, AlertCircle, Users, Clock } from "lucide-react";
+import { Search, ArrowRight, AlertCircle, Users, Clock, Map } from "lucide-react";
 import { useState, useCallback } from "react";
+import ChangeGraph from "./ChangeGraph";
 
 interface ExecQueryProps {
   isVisible: boolean;
@@ -23,6 +24,7 @@ export default function ExecQuery({ isVisible, autoQuery }: ExecQueryProps) {
   const [query, setQuery] = useState(autoQuery ? "What changed today?" : "");
   const [showResponse, setShowResponse] = useState(!!autoQuery);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showVisualMap, setShowVisualMap] = useState(false);
 
   const { displayText, isComplete } = useStreamText(
     execQueryResponse.summary,
@@ -95,8 +97,23 @@ export default function ExecQuery({ isVisible, autoQuery }: ExecQueryProps) {
           >
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-4">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
-                Briefing
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Briefing
+                </div>
+                <button
+                  onClick={() => setShowVisualMap(!showVisualMap)}
+                  className={`
+                    flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-colors
+                    ${showVisualMap 
+                      ? "bg-primary/15 text-primary" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    }
+                  `}
+                >
+                  <Map className="w-3 h-3" />
+                  <span>Visual Map</span>
+                </button>
               </div>
               <div className="text-sm text-foreground leading-relaxed">
                 {displayText}
@@ -105,6 +122,19 @@ export default function ExecQuery({ isVisible, autoQuery }: ExecQueryProps) {
                 )}
               </div>
             </div>
+
+            {/* Visual Change Map */}
+            <AnimatePresence>
+              {showVisualMap && isComplete && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <ChangeGraph isVisible={true} />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {isComplete && (
               <motion.div
