@@ -102,27 +102,27 @@ export default function Index() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top bar */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 h-12 sm:h-14 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center">
-                <Zap className="w-3.5 h-3.5 text-primary" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center">
+                <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
               </div>
-              <span className="font-heading font-bold text-foreground tracking-tight">JARVIS</span>
+              <span className="font-heading font-bold text-foreground tracking-tight text-sm sm:text-base">JARVIS</span>
             </div>
-            <span className="text-[10px] text-muted-foreground font-mono hidden sm:inline border border-border px-2 py-0.5 rounded-full">
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground font-mono hidden md:inline border border-border px-1.5 sm:px-2 py-0.5 rounded-full">
               AI Chief of Staff
             </span>
           </div>
 
-          {/* Pipeline */}
-          <div className="hidden md:block">
+          {/* Pipeline - hidden on mobile/tablet, shown on large screens */}
+          <div className="hidden lg:block">
             <PipelineBar currentStep={step} onStepClick={handleStepClick} />
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5">
             <button
               onClick={() => setShowStakeholderMap(!showStakeholderMap)}
               className={`
@@ -149,10 +149,23 @@ export default function Index() {
             >
               <UserPlus className="w-3.5 h-3.5" />
             </button>
-            <div className="w-px h-4 bg-border mx-1 hidden sm:block" />
+            <div className="w-px h-4 bg-border mx-0.5 sm:mx-1 hidden sm:block" />
             <button
               onClick={() => setShowPipeline(!showPipeline)}
-              className="text-[10px] text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md hover:bg-secondary transition-colors hidden sm:block"
+              className={`
+                p-1.5 rounded-md transition-colors lg:hidden
+                ${showPipeline 
+                  ? "bg-primary/15 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }
+              `}
+              title="Show Pipeline"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setShowPipeline(!showPipeline)}
+              className="text-[10px] text-muted-foreground hover:text-foreground px-2 sm:px-2.5 py-1.5 rounded-md hover:bg-secondary transition-colors hidden lg:block"
             >
               How it thinks
             </button>
@@ -166,7 +179,7 @@ export default function Index() {
             <button
               onClick={demoMode ? () => setDemoMode(false) : handleStartDemo}
               className={`
-                flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+                flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
                 ${demoMode
                   ? "bg-primary/15 text-primary border border-primary/30"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -174,13 +187,13 @@ export default function Index() {
               `}
             >
               {demoMode ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              {demoMode ? "Pause" : "Demo"}
+              <span className="hidden xs:inline">{demoMode ? "Pause" : "Demo"}</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Pipeline visualization */}
+      {/* Pipeline visualization - scrollable on mobile */}
       <AnimatePresence>
         {showPipeline && (
           <motion.div
@@ -190,16 +203,17 @@ export default function Index() {
             transition={{ duration: 0.3 }}
             className="overflow-hidden border-b border-border bg-muted/30"
           >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-3">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+              <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2 sm:mb-3">
                 How JARVIS Thinks
               </div>
-              <div className="flex items-center gap-1 overflow-x-auto">
+              <div className="flex items-center gap-1 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
                 {pipelineSteps.map((s, i) => (
-                  <div key={s.id} className="flex items-center">
-                    <div
+                  <div key={s.id} className="flex items-center flex-shrink-0">
+                    <button
+                      onClick={() => handleStepClick(i)}
                       className={`
-                        px-3 py-2 rounded-lg text-xs border transition-all duration-300 whitespace-nowrap
+                        px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs border transition-all duration-300 whitespace-nowrap
                         ${i === step
                           ? "border-primary/30 bg-primary/10 text-primary"
                           : i < step
@@ -209,8 +223,8 @@ export default function Index() {
                       `}
                     >
                       <div className="font-medium">{s.label}</div>
-                      <div className="text-[10px] opacity-60 mt-0.5">{s.description}</div>
-                    </div>
+                      <div className="text-[9px] sm:text-[10px] opacity-60 mt-0.5 hidden sm:block">{s.description}</div>
+                    </button>
                     {i < pipelineSteps.length - 1 && (
                       <ChevronRight className="w-3 h-3 text-border mx-0.5 flex-shrink-0" />
                     )}
@@ -223,34 +237,34 @@ export default function Index() {
       </AnimatePresence>
 
       {/* Main content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 md:px-6 py-4 sm:py-6">
         {/* Landing state */}
         {step === -1 && !selectedSignal && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center min-h-[60vh] text-center"
+            className="flex flex-col items-center justify-center min-h-[50vh] sm:min-h-[60vh] text-center px-4"
           >
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6">
-              <Zap className="w-7 h-7 text-primary" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 sm:mb-6">
+              <Zap className="w-5 h-5 sm:w-7 sm:h-7 text-primary" />
             </div>
-            <h1 className="font-heading text-3xl sm:text-4xl font-bold text-foreground mb-3 tracking-tight">
+            <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 sm:mb-3 tracking-tight">
               The Nervous System<br />of Your Organization
             </h1>
-            <p className="text-sm text-muted-foreground max-w-md mb-8 leading-relaxed">
+            <p className="text-xs sm:text-sm text-muted-foreground max-w-md mb-6 sm:mb-8 leading-relaxed">
               JARVIS transforms signals into structured understanding, surfaces conflicts before they escalate, and routes actions to the right people with the right context.
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
               <button
                 onClick={handleStartDemo}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors w-full sm:w-auto"
               >
                 <Play className="w-4 h-4" />
                 Watch Demo
               </button>
               <button
                 onClick={() => setStep(0)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-secondary transition-colors"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-secondary transition-colors w-full sm:w-auto"
               >
                 Try It
               </button>
@@ -277,9 +291,9 @@ export default function Index() {
 
         {/* Step content */}
         {(step >= 0 || selectedSignal) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pb-20 sm:pb-6">
             {/* Left column: Signal + Classification */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <SignalIngest
                 selectedSignal={selectedSignal}
                 onSignalSelect={handleSignalSelect}
@@ -304,7 +318,7 @@ export default function Index() {
             </div>
 
             {/* Right column: Graph + Truth + Actions + Query */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <OrgGraph
                 isVisible={step >= 2}
                 showAfter={showGraphAfter}
@@ -322,34 +336,36 @@ export default function Index() {
           </div>
         )}
 
-        {/* Advance button (non-demo mode) */}
+        {/* Advance button (non-demo mode) - responsive positioning */}
         {step >= 0 && step < pipelineSteps.length - 1 && !demoMode && selectedSignal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed bottom-6 right-6 z-20"
+            className="fixed bottom-4 sm:bottom-6 right-3 sm:right-6 z-20"
           >
             <button
               onClick={handleAdvance}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium shadow-lg hover:bg-primary/90 transition-all glow-primary"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-primary text-primary-foreground text-xs sm:text-sm font-medium shadow-lg hover:bg-primary/90 transition-all glow-primary"
             >
-              Next: {pipelineSteps[step + 1]?.label}
-              <ChevronRight className="w-4 h-4" />
+              <span className="hidden xs:inline">Next:</span> {pipelineSteps[step + 1]?.label}
+              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </motion.div>
         )}
 
-        {/* Status bar */}
+        {/* Status bar - responsive positioning */}
         {step >= 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed bottom-6 left-6 z-20"
+            className="fixed bottom-4 sm:bottom-6 left-3 sm:left-6 z-20"
           >
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/90 backdrop-blur-sm border border-border text-[10px] text-muted-foreground font-mono">
-              <div className={`w-1.5 h-1.5 rounded-full ${demoMode ? "bg-primary pulse-dot" : step < pipelineSteps.length - 1 ? "bg-accent" : "bg-intent-task"}`} />
-              {demoMode ? "Demo running" : currentStepLabel}
-              {step >= 0 && ` (${step + 1}/${pipelineSteps.length})`}
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-card/90 backdrop-blur-sm border border-border text-[9px] sm:text-[10px] text-muted-foreground font-mono">
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${demoMode ? "bg-primary pulse-dot" : step < pipelineSteps.length - 1 ? "bg-accent" : "bg-intent-task"}`} />
+              <span className="truncate max-w-[100px] sm:max-w-none">
+                {demoMode ? "Demo" : currentStepLabel}
+              </span>
+              <span className="flex-shrink-0">({step + 1}/{pipelineSteps.length})</span>
             </div>
           </motion.div>
         )}
