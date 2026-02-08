@@ -18,7 +18,7 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
   const transcriptRef = useRef("");
   const fallbackTimerRef = useRef<number | null>(null);
   const fallbackNoResultRef = useRef<number | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const fallbackActiveRef = useRef(false);
   const lastTranscriptAtRef = useRef<number | null>(null);
 
@@ -40,9 +40,11 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
   });
 
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    const recognition = new SpeechRecognition();
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) return;
+
+    const recognition = new SpeechRecognitionCtor();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
@@ -64,7 +66,7 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
     const recognition = recognitionRef.current;
     if (!recognition || fallbackActiveRef.current) return;
     fallbackActiveRef.current = true;
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: any) => {
       const last = event.results[event.results.length - 1];
       const transcript = last?.[0]?.transcript?.trim() || "";
       if (!transcript) return;
