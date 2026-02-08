@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Signal } from "@/lib/api";
 import { MessageSquare, Mic, Image, Mail } from "lucide-react";
 import VoiceInput from "./VoiceInput";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 interface SignalIngestProps {
   signals: Signal[];
@@ -68,23 +68,76 @@ export default function SignalIngest({
   const [textType, setTextType] = useState<Signal["type"]>("slack");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOcrRunning, setIsOcrRunning] = useState(false);
+  const [voiceMode, setVoiceMode] = useState<"fields" | "signal">("fields");
+
+  const voiceHint = useMemo(
+    () => 'Say: "title ... source ... type ... message ..." (or just dictate message)',
+    []
+  );
+
+  const applyTranscriptToFields = useCallback(
+    (transcript: string) => {
+      const text = transcript.trim();
+      if (!text) return;
+
+      const getSegment = (label: string) => {
+        const re = new RegExp(`${label}\\s*(?:is|:)?\\s*([\\s\\S]*?)(?=(title|source|field|type|message|content)\\b|$)`, "i");
+        const match = text.match(re);
+        return match?.[1]?.trim();
+      };
+
+      const titleSeg = getSegment("title");
+      const sourceSeg = getSegment("source") || getSegment("field");
+      const typeSeg = getSegment("type");
+      const messageSeg = getSegment("message") || getSegment("content");
+
+      if (titleSeg) setTextTitle(titleSeg);
+      if (sourceSeg) setTextSource(sourceSeg);
+      if (typeSeg) {
+        const lowered = typeSeg.toLowerCase();
+        if (lowered.includes("meeting")) setTextType("meeting");
+        else if (lowered.includes("email")) setTextType("email");
+        else if (lowered.includes("screenshot")) setTextType("screenshot");
+        else if (lowered.includes("slack")) setTextType("slack");
+      }
+
+      if (messageSeg) {
+        setTextContent(messageSeg);
+        return;
+      }
+
+      if (/\b(add signal|submit|send)\b/i.test(text)) {
+        handleTextSubmit();
+        return;
+      }
+
+      if (!titleSeg && !sourceSeg && !typeSeg) {
+        setTextContent((prev) => (prev ? `${prev} ${text}` : text));
+      }
+    },
+    []
+  );
 
   const handleVoiceTranscript = useCallback(async (text: string) => {
-    if (onVoiceTranscript) {
-      const voiceSignal = await onVoiceTranscript(text);
-      onSignalSelect(voiceSignal);
-    } else {
-      const voiceSignal: Signal = {
-        id: "voice-" + Date.now(),
-        type: "meeting",
-        title: "Voice Note",
-        source: "Voice Input",
-        timestamp: "Just now",
-        content: text,
-      };
-      onSignalSelect(voiceSignal);
+    if (voiceMode === "signal") {
+      if (onVoiceTranscript) {
+        const voiceSignal = await onVoiceTranscript(text);
+        onSignalSelect(voiceSignal);
+      } else {
+        const voiceSignal: Signal = {
+          id: "voice-" + Date.now(),
+          type: "meeting",
+          title: "Voice Note",
+          source: "Voice Input",
+          timestamp: "Just now",
+          content: text,
+        };
+        onSignalSelect(voiceSignal);
+      }
+      return;
     }
-  }, [onSignalSelect, onVoiceTranscript]);
+    applyTranscriptToFields(text);
+  }, [applyTranscriptToFields, onSignalSelect, onVoiceTranscript, voiceMode]);
 
   const handleTextSubmit = useCallback(async () => {
     if (!onTextSubmit || !textContent.trim() || isSubmitting) return;
@@ -167,11 +220,26 @@ export default function SignalIngest({
           <h2 className="font-heading text-lg font-semibold text-foreground mb-1">Signal Ingest</h2>
           <p className="text-xs text-muted-foreground">Select a signal or use voice input {isProcessing && "(processing…)"}</p>
         </div>
-        <VoiceInput onTranscript={handleVoiceTranscript} disabled={isProcessing} />
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span>Voice</span>
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={voiceMode === "fields"}
+                onChange={(e) => setVoiceMode(e.target.checked ? "fields" : "signal")}
+                className="accent-primary"
+              />
+              <span>{voiceMode === "fields" ? "to fields" : "as signal"}</span>
+            </label>
+          </div>
+          <VoiceInput onTranscript={handleVoiceTranscript} disabled={isProcessing} />
+        </div>
       </div>
 
       {/* Manual ingest */}
       <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <div className="text-[10px] text-muted-foreground">{voiceHint}</div>
         <div className="flex flex-wrap gap-1.5">
           {presets.map((preset) => (
             <button
