@@ -27,6 +27,33 @@ const typeLabels = {
   email: "Email Thread",
 };
 
+const presets = [
+  {
+    label: "Decision Made",
+    type: "meeting" as const,
+    title: "Leadership Decision",
+    source: "Exec Sync",
+    content:
+      "Decision: Approve expedited API migration to Feb 28. Platform team will take two engineers from Mobile for 2 weeks. CFO approved budget reallocation.",
+  },
+  {
+    label: "Conflict Flag",
+    type: "slack" as const,
+    title: "Resource Conflict",
+    source: "Marcus Rivera",
+    content:
+      "I can't approve pulling two mobile engineers this sprint. Mobile roadmap is at risk and we already committed to the release.",
+  },
+  {
+    label: "Risk Update",
+    type: "email" as const,
+    title: "SOC2 Findings",
+    source: "Compliance",
+    content:
+      "SOC2 audit returned three critical findings overlapping with the migration timeline. Recommend pausing release until mitigation plan is approved.",
+  },
+];
+
 export default function SignalIngest({
   signals,
   selectedSignal,
@@ -78,6 +105,29 @@ export default function SignalIngest({
     }
   }, [isSubmitting, onTextSubmit, onSignalSelect, textContent, textSource, textTitle, textType]);
 
+  const handlePreset = useCallback(
+    async (preset: (typeof presets)[number]) => {
+      setTextTitle(preset.title);
+      setTextSource(preset.source);
+      setTextType(preset.type);
+      setTextContent(preset.content);
+      if (!onTextSubmit || isSubmitting || isProcessing) return;
+      setIsSubmitting(true);
+      try {
+        const saved = await onTextSubmit({
+          content: preset.content,
+          title: preset.title,
+          source: preset.source,
+          type: preset.type,
+        });
+        onSignalSelect(saved);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [isProcessing, isSubmitting, onSignalSelect, onTextSubmit]
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -90,6 +140,18 @@ export default function SignalIngest({
 
       {/* Manual ingest */}
       <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map((preset) => (
+            <button
+              key={preset.label}
+              onClick={() => handlePreset(preset)}
+              disabled={isSubmitting || isProcessing}
+              className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-secondary/40 text-foreground hover:bg-secondary disabled:opacity-40"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             value={textTitle}
