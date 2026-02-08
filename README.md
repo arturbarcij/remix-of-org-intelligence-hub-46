@@ -44,7 +44,7 @@ The frontend proxies `/api` to the local JARVIS API server on port 3001.
 # In another terminal from repo root
 npm --prefix server install
 copy server\\.env.example server\\.env
-# Add OPENROUTER_API_KEY to server\\.env
+# Add OPENROUTER_API_KEY to server\\.env (and optionally OPENROUTER_MODEL)
 npm run server:dev
 ```
 

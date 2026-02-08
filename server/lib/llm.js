@@ -26,7 +26,7 @@ async function chat(model, messages, options = {}) {
     throw new Error('OPENROUTER_API_KEY not set');
   }
   const payload = JSON.stringify({
-    model: model || 'openai/gpt-4o-mini',
+    model: model || process.env.OPENROUTER_MODEL || 'openai/gpt-5-mini',
     messages,
     max_tokens: options.maxTokens || 4000,
     response_format: options.json ? { type: 'json_object' } : undefined,

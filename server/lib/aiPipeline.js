@@ -3,6 +3,7 @@ const { chat } = require('./llm');
 const INTENT_TYPES = ['decision', 'task', 'fyi', 'risk', 'conflict'];
 const NODE_TYPES = ['person', 'team', 'topic', 'decision', 'task', 'system'];
 const TOOL_TYPES = ['slack', 'notion', 'linear', 'github', 'gmail'];
+const DEFAULT_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-5-mini';
 
 // ─── Classification ────────────────────────────────────────────
 async function classifySignal(signal) {
@@ -23,7 +24,7 @@ Return a JSON object with this exact structure:
 }
 
 Be thorough but only include entities clearly mentioned. Keep citations short.`;
-  const raw = await chat('openai/gpt-4o-mini', [{ role: 'user', content: prompt }], { json: true });
+  const raw = await chat(DEFAULT_MODEL, [{ role: 'user', content: prompt }], { json: true });
   const parsed = JSON.parse(raw);
   return {
     primary: parsed.primary || { intent: 'fyi', confidence: 0.5 },
@@ -61,7 +62,7 @@ Return JSON:
 }
 
 Include ALL previous nodes (isNew: false) plus new ones (isNew: true). Use kebab-case ids. Place new nodes around center 350,200.`;
-  const raw = await chat('openai/gpt-4o-mini', [{ role: 'user', content: prompt }], { json: true });
+  const raw = await chat(DEFAULT_MODEL, [{ role: 'user', content: prompt }], { json: true });
   const out = JSON.parse(raw);
   return {
     nodes: out.nodes || prevNodes,
@@ -92,7 +93,7 @@ Return JSON:
   ]
 }
 If no conflicts, return { "conflicts": [] }.`;
-  const raw = await chat('openai/gpt-4o-mini', [{ role: 'user', content: prompt }], { json: true });
+  const raw = await chat(DEFAULT_MODEL, [{ role: 'user', content: prompt }], { json: true });
   const parsed = JSON.parse(raw);
   const list = parsed.conflicts || [];
   return list.map((c, i) => ({ ...c, id: `c${i + 1}` }));
@@ -113,7 +114,7 @@ Return JSON:
   ]
 }
 Only include concrete decisions, dates, allocations. If nothing, return { "changes": [] }.`;
-  const raw = await chat('openai/gpt-4o-mini', [{ role: 'user', content: prompt }], { json: true });
+  const raw = await chat(DEFAULT_MODEL, [{ role: 'user', content: prompt }], { json: true });
   const parsed = JSON.parse(raw);
   return parsed.changes || [];
 }
@@ -143,7 +144,7 @@ Return JSON:
   ]
 }
 Limit to 5 actions. Be specific.`;
-  const raw = await chat('openai/gpt-4o-mini', [{ role: 'user', content: prompt }], { json: true });
+  const raw = await chat(DEFAULT_MODEL, [{ role: 'user', content: prompt }], { json: true });
   const parsed = JSON.parse(raw);
   const list = parsed.actions || [];
   return list.map((a, i) => ({ ...a, id: `a${i + 1}` }));
