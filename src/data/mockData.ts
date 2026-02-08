@@ -1,96 +1,12 @@
-// ─── Types ────────────────────────────────────────────────────
-
-export type IntentType = "decision" | "task" | "fyi" | "risk" | "conflict";
-export type ToolType = "slack" | "notion" | "linear" | "github" | "gmail";
-export type NodeType = "person" | "team" | "topic" | "decision" | "task" | "system";
-
-export interface Signal {
-  id: string;
-  type: "slack" | "meeting" | "screenshot" | "email";
-  title: string;
-  source: string;
-  timestamp: string;
-  content: string;
-}
-
-export interface ExtractedEntity {
-  name: string;
-  role?: string;
-  citation: string;
-}
-
-export interface Classification {
-  primary: { intent: IntentType; confidence: number };
-  secondary: { intent: IntentType; confidence: number }[];
-  people: ExtractedEntity[];
-  teams: ExtractedEntity[];
-  topics: ExtractedEntity[];
-  systems: ExtractedEntity[];
-}
-
-export interface GraphNode {
-  id: string;
-  label: string;
-  type: NodeType;
-  x: number;
-  y: number;
-  isNew?: boolean;
-}
-
-export interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  label?: string;
-  isNew?: boolean;
-  edgeType?: "normal" | "conflict" | "dependency";
-}
-
-export interface GraphState {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-}
-
-export interface TruthChange {
-  field: string;
-  from?: string;
-  to: string;
-  reason: string;
-  owner: string;
-}
-
-export interface TruthVersion {
-  version: number;
-  timestamp: string;
-  changes: TruthChange[];
-}
-
-export interface Conflict {
-  id: string;
-  title: string;
-  sourceA: { person: string; claim: string };
-  sourceB: { person: string; claim: string };
-  severity: "high" | "medium" | "low";
-  suggestedResolution: string;
-}
-
-export interface ActionItem {
-  id: string;
-  tool: ToolType;
-  stakeholder: string;
-  reason: string;
-  context: string;
-  preview: string;
-  requiresConfirmation: boolean;
-  priority: "high" | "medium" | "low";
-}
-
-export interface QueryResponse {
-  summary: string;
-  stakeholders: { name: string; impact: string; action: string }[];
-  pendingActions: number;
-  riskLevel: string;
-}
+import type {
+  ActionItem,
+  Classification,
+  Conflict,
+  GraphState,
+  QueryResponse,
+  Signal,
+  TruthVersion,
+} from "@/lib/api";
 
 // ─── Signals ──────────────────────────────────────────────────
 

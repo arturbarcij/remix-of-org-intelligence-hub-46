@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
-import { truthVersions, TruthVersion } from "@/data/mockData";
+import { truthVersions as mockTruthVersions } from "@/data/mockData";
+import type { TruthVersion } from "@/lib/api";
 import { GitBranch, ArrowRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface TruthPanelProps {
   isVisible: boolean;
+  truthVersions?: TruthVersion[];
 }
 
 const containerVariants = {
@@ -17,10 +19,34 @@ const itemVariants = {
   visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
 };
 
-export default function TruthPanel({ isVisible }: TruthPanelProps) {
-  const [activeVersion, setActiveVersion] = useState(truthVersions.length - 1);
+export default function TruthPanel({ isVisible, truthVersions: propTruthVersions }: TruthPanelProps) {
+  const truthVersions = propTruthVersions ?? mockTruthVersions;
+  const [activeVersion, setActiveVersion] = useState(Math.max(0, truthVersions.length - 1));
+
+  useEffect(() => {
+    setActiveVersion(Math.max(0, truthVersions.length - 1));
+  }, [truthVersions.length]);
 
   if (!isVisible) return null;
+
+  if (truthVersions.length === 0) {
+    return (
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-4"
+      >
+        <motion.div variants={itemVariants}>
+          <h2 className="font-heading text-lg font-semibold text-foreground mb-1">Source of Truth</h2>
+          <p className="text-xs text-muted-foreground">Versioned organizational state</p>
+        </motion.div>
+        <motion.div variants={itemVariants} className="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground">
+          No truth updates yet. Process a signal to create the first version.
+        </motion.div>
+      </motion.div>
+    );
+  }
 
   const currentVersion = truthVersions[activeVersion];
 

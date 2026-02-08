@@ -1,13 +1,17 @@
 import { motion } from "framer-motion";
-import { conflicts } from "@/data/mockData";
+import { conflicts as mockConflicts } from "@/data/mockData";
+import type { Conflict } from "@/lib/api";
 import { AlertTriangle, ArrowLeftRight } from "lucide-react";
 
 interface ConflictAlertProps {
   isVisible: boolean;
+  conflicts?: Conflict[];
 }
 
-export default function ConflictAlert({ isVisible }: ConflictAlertProps) {
+export default function ConflictAlert({ isVisible, conflicts: propConflicts }: ConflictAlertProps) {
   if (!isVisible) return null;
+
+  const conflicts = propConflicts ?? mockConflicts;
 
   return (
     <motion.div
@@ -20,6 +24,12 @@ export default function ConflictAlert({ isVisible }: ConflictAlertProps) {
         <h2 className="font-heading text-lg font-semibold text-foreground mb-1">Conflict Detection</h2>
         <p className="text-xs text-muted-foreground">Contradictions identified by the Critic Agent</p>
       </div>
+
+      {conflicts.length === 0 && (
+        <div className="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground">
+          No conflicts detected yet. JARVIS will surface misalignment as new signals arrive.
+        </div>
+      )}
 
       {conflicts.map((conflict) => (
         <motion.div

@@ -14,11 +14,25 @@ import NewStakeholderContext from "@/components/jarvis/NewStakeholderContext";
 import InformationFlow from "@/components/jarvis/InformationFlow";
 import BlindSpots from "@/components/jarvis/BlindSpots";
 import AgentThinking from "@/components/jarvis/AgentThinking";
-import { Signal, signals, pipelineSteps } from "@/data/mockData";
+import { pipelineSteps } from "@/data/mockData";
+import type { Signal } from "@/lib/api";
+import { usePipeline } from "@/hooks/usePipeline";
 
 const DEMO_DELAYS = [1500, 2500, 2000, 2500, 2000, 1500, 2000];
 
 export default function Index() {
+  const {
+    signals,
+    pipelineData,
+    processSignal,
+    isProcessing,
+    queryResponse,
+    submitQuery,
+    isQuerying,
+    addSignalFromVoice,
+    apiLive,
+  } = usePipeline();
+
   const [step, setStep] = useState(-1);
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [showGraphAfter, setShowGraphAfter] = useState(false);
@@ -43,8 +57,9 @@ export default function Index() {
           if (step >= 0 && step < pipelineSteps.length - 1 && selectedSignal) {
             if (step === 1) setShowGraphAfter(false);
             setStep((s) => s + 1);
-          } else if (step === -1) {
+          } else if (step === -1 && signals[0]) {
             setSelectedSignal(signals[0]);
+            processSignal(signals[0]);
             setStep(0);
           }
           break;
@@ -87,16 +102,17 @@ export default function Index() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [step, demoMode, selectedSignal]);
+  }, [step, demoMode, selectedSignal, signals, processSignal]);
 
   // Demo auto-advance
   useEffect(() => {
     if (!demoMode) return;
 
     // First: auto-select signal
-    if (step === -1) {
+    if (step === -1 && signals[0]) {
       const t = setTimeout(() => {
         setSelectedSignal(signals[0]);
+        processSignal(signals[0]);
         setStep(0);
       }, 1000);
       return () => clearTimeout(t);
@@ -115,7 +131,7 @@ export default function Index() {
     }, DEMO_DELAYS[step] ?? 2000);
 
     return () => clearTimeout(t);
-  }, [demoMode, step]);
+  }, [demoMode, step, signals, processSignal]);
 
   // Show graph after state shortly after graph step
   useEffect(() => {
@@ -127,8 +143,9 @@ export default function Index() {
 
   const handleSignalSelect = useCallback((signal: Signal) => {
     setSelectedSignal(signal);
+    processSignal(signal);
     if (step < 0) setStep(0);
-  }, [step]);
+  }, [step, processSignal]);
 
   const handleStepClick = useCallback((s: number) => {
     setStep(s);
@@ -172,7 +189,7 @@ export default function Index() {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 h-12 sm:h-14 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-1.5 sm:gap-2">
               <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center">
                 <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
@@ -180,7 +197,7 @@ export default function Index() {
               <span className="font-heading font-bold text-foreground tracking-tight text-sm sm:text-base">JARVIS</span>
             </div>
             <span className="text-[9px] sm:text-[10px] text-muted-foreground font-mono hidden md:inline border border-border px-1.5 sm:px-2 py-0.5 rounded-full">
-              AI Chief of Staff
+              {apiLive ? "API connected" : "Demo mode"}
             </span>
           </div>
 
@@ -476,13 +493,16 @@ export default function Index() {
             {/* Left column: Signal + Classification */}
             <div className="space-y-4 sm:space-y-6">
               <SignalIngest
+                signals={signals}
                 selectedSignal={selectedSignal}
                 onSignalSelect={handleSignalSelect}
+                onVoiceTranscript={addSignalFromVoice}
+                isProcessing={isProcessing}
               />
 
-              <IntentPanel isVisible={step >= 1} />
+              <IntentPanel isVisible={step >= 1} classification={pipelineData.classification} />
 
-              <ConflictAlert isVisible={step >= 4} />
+              <ConflictAlert isVisible={step >= 4} conflicts={pipelineData.conflicts} />
 
               {/* Blind Spots - Left column when enabled */}
               <AnimatePresence>
@@ -516,15 +536,20 @@ export default function Index() {
               <OrgGraph
                 isVisible={step >= 2}
                 showAfter={showGraphAfter}
+                graphBefore={pipelineData.graphBefore}
+                graphAfter={pipelineData.graphAfter}
               />
 
-              <TruthPanel isVisible={step >= 3} />
+              <TruthPanel isVisible={step >= 3} truthVersions={pipelineData.truthVersions} />
 
-              <ActionPanel isVisible={step >= 5} />
+              <ActionPanel isVisible={step >= 5} actions={pipelineData.actions} />
 
               <ExecQuery
                 isVisible={step >= 6}
                 autoQuery={demoMode}
+                onSubmitQuery={submitQuery}
+                queryResponse={queryResponse}
+                isQuerying={isQuerying}
               />
             </div>
           </div>

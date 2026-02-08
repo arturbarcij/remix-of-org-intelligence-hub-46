@@ -1,11 +1,14 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { graphBefore, graphAfter, GraphNode, GraphEdge, NodeType } from "@/data/mockData";
+import { graphBefore as mockGraphBefore, graphAfter as mockGraphAfter } from "@/data/mockData";
+import type { GraphNode, GraphEdge, NodeType } from "@/lib/api";
 import { useState } from "react";
 import { X, Filter, MessageSquare, Clock, Users } from "lucide-react";
 
 interface OrgGraphProps {
   showAfter: boolean;
   isVisible: boolean;
+  graphBefore?: { nodes: GraphNode[]; edges: GraphEdge[] } | null;
+  graphAfter?: { nodes: GraphNode[]; edges: GraphEdge[] } | null;
 }
 
 const nodeColors: Record<NodeType, string> = {
@@ -304,13 +307,15 @@ function EdgeLine({
   );
 }
 
-export default function OrgGraph({ showAfter, isVisible }: OrgGraphProps) {
+export default function OrgGraph({ showAfter, isVisible, graphBefore: propGraphBefore, graphAfter: propGraphAfter }: OrgGraphProps) {
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<{ edge: GraphEdge; x: number; y: number } | null>(null);
   const [filter, setFilter] = useState<NodeType | "all">("all");
 
   if (!isVisible) return null;
 
+  const graphBefore = propGraphBefore ?? mockGraphBefore;
+  const graphAfter = propGraphAfter ?? mockGraphAfter;
   const graph = showAfter ? graphAfter : graphBefore;
   const nodeTypes: NodeType[] = ["person", "team", "topic", "decision", "task", "system"];
 
@@ -398,6 +403,12 @@ export default function OrgGraph({ showAfter, isVisible }: OrgGraphProps) {
             />
           ))}
         </svg>
+
+        {graph.nodes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+            No graph data yet. Process a signal to build the knowledge map.
+          </div>
+        )}
 
         {/* Node popup */}
         <AnimatePresence>

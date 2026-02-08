@@ -1,13 +1,17 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { execQueryResponse, QueryResponse } from "@/data/mockData";
+import { execQueryResponse as mockQueryResponse } from "@/data/mockData";
+import type { QueryResponse } from "@/lib/api";
 import { useStreamText } from "@/hooks/useStreamText";
 import { Search, ArrowRight, AlertCircle, Users, Clock, Map } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import ChangeGraph from "./ChangeGraph";
 
 interface ExecQueryProps {
   isVisible: boolean;
   autoQuery?: boolean;
+  onSubmitQuery?: (query: string) => Promise<QueryResponse>;
+  queryResponse?: QueryResponse | null;
+  isQuerying?: boolean;
 }
 
 const containerVariants = {
@@ -20,26 +24,33 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
 
-export default function ExecQuery({ isVisible, autoQuery }: ExecQueryProps) {
+export default function ExecQuery({ isVisible, autoQuery, onSubmitQuery, queryResponse: propQueryResponse, isQuerying }: ExecQueryProps) {
   const [query, setQuery] = useState(autoQuery ? "What changed today?" : "");
   const [showResponse, setShowResponse] = useState(!!autoQuery);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [localResponse, setLocalResponse] = useState<QueryResponse | null>(propQueryResponse ?? null);
   const [showVisualMap, setShowVisualMap] = useState(false);
 
+  const response = propQueryResponse ?? localResponse ?? mockQueryResponse;
   const { displayText, isComplete } = useStreamText(
-    execQueryResponse.summary,
+    response.summary,
     15,
     showResponse
   );
 
-  const handleSubmit = useCallback(() => {
-    if (!query.trim() || isProcessing) return;
-    setIsProcessing(true);
-    setTimeout(() => {
-      setShowResponse(true);
-      setIsProcessing(false);
-    }, 800);
-  }, [query, isProcessing]);
+  useEffect(() => {
+    if (propQueryResponse) setLocalResponse(propQueryResponse);
+  }, [propQueryResponse]);
+
+  const handleSubmit = useCallback(async () => {
+    if (!query.trim() || isQuerying) return;
+    setShowResponse(true);
+    if (onSubmitQuery) {
+      const res = await onSubmitQuery(query);
+      setLocalResponse(res);
+    } else {
+      setLocalResponse(mockQueryResponse);
+    }
+  }, [query, isQuerying, onSubmitQuery]);
 
   if (!isVisible) return null;
 
@@ -68,7 +79,7 @@ export default function ExecQuery({ isVisible, autoQuery }: ExecQueryProps) {
           />
           <button
             onClick={handleSubmit}
-            disabled={!query.trim() || isProcessing}
+            disabled={!query.trim() || isQuerying}
             className="p-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-30"
           >
             <ArrowRight className="w-3.5 h-3.5" />
@@ -76,7 +87,7 @@ export default function ExecQuery({ isVisible, autoQuery }: ExecQueryProps) {
         </div>
       </motion.div>
 
-      {isProcessing && (
+      {isQuerying && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -152,7 +163,7 @@ export default function ExecQuery({ isVisible, autoQuery }: ExecQueryProps) {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {execQueryResponse.stakeholders.map((s, i) => (
+                    {response.stakeholders.map((s, i) => (
                       <motion.div
                         key={s.name}
                         initial={{ opacity: 0, x: 8 }}
@@ -175,13 +186,13 @@ export default function ExecQuery({ isVisible, autoQuery }: ExecQueryProps) {
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card">
                     <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="text-xs text-foreground">
-                      <span className="font-mono text-primary">{execQueryResponse.pendingActions}</span> pending actions
+                      <span className="font-mono text-primary">{response.pendingActions}</span> pending actions
                     </span>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-intent-risk/20 bg-intent-risk/5">
                     <AlertCircle className="w-3.5 h-3.5 text-intent-risk" />
                     <span className="text-xs text-foreground">
-                      Risk: <span className="font-mono text-intent-risk">{execQueryResponse.riskLevel}</span>
+                      Risk: <span className="font-mono text-intent-risk">{response.riskLevel}</span>
                     </span>
                   </div>
                 </div>

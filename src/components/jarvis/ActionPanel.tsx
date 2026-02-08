@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { actions, ActionItem, ToolType } from "@/data/mockData";
+import { actions as mockActions } from "@/data/mockData";
+import type { ActionItem, ToolType } from "@/lib/api";
 import { 
   MessageSquare, FileText, BarChart3, Github, Mail, 
   ToggleLeft, ToggleRight, Volume2, VolumeX, Clock, 
@@ -9,6 +10,7 @@ import { useState } from "react";
 
 interface ActionPanelProps {
   isVisible: boolean;
+  actions?: ActionItem[];
 }
 
 const toolIcons: Record<ToolType, typeof MessageSquare> = {
@@ -200,8 +202,10 @@ function ActionCard({ action }: { action: ActionItem }) {
   );
 }
 
-export default function ActionPanel({ isVisible }: ActionPanelProps) {
+export default function ActionPanel({ isVisible, actions: propActions }: ActionPanelProps) {
   if (!isVisible) return null;
+
+  const actions = propActions ?? mockActions;
 
   return (
     <motion.div
@@ -218,6 +222,11 @@ export default function ActionPanel({ isVisible }: ActionPanelProps) {
       </motion.div>
 
       <div className="grid gap-3">
+        {actions.length === 0 && (
+          <div className="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground">
+            No actions recommended yet. Ingest and process a signal to generate routes.
+          </div>
+        )}
         {actions.map((action) => (
           <ActionCard key={action.id} action={action} />
         ))}

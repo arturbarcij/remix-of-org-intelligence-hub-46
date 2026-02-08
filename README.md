@@ -36,6 +36,24 @@ npm i
 npm run dev
 ```
 
+## Run the JARVIS API (required for live data)
+
+The frontend proxies `/api` to the local JARVIS API server on port 3001.
+
+```sh
+# In another terminal from repo root
+npm --prefix server install
+copy server\\.env.example server\\.env
+# Add OPENROUTER_API_KEY to server\\.env
+npm run server:dev
+```
+
+Then start the frontend with:
+
+```sh
+npm run dev
+```
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).

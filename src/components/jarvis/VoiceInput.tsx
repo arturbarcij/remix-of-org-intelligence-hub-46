@@ -3,8 +3,9 @@ import { Mic, MicOff, Loader2 } from "lucide-react";
 import { useState, useCallback } from "react";
 
 interface VoiceInputProps {
-  onTranscript: (text: string) => void;
+  onTranscript: (text: string) => void | Promise<unknown>;
   className?: string;
+  disabled?: boolean;
 }
 
 const mockTranscripts = [
@@ -14,11 +15,12 @@ const mockTranscripts = [
   "The board meeting has been moved to Friday. Need to update the deck.",
 ];
 
-export default function VoiceInput({ onTranscript, className = "" }: VoiceInputProps) {
+export default function VoiceInput({ onTranscript, className = "", disabled = false }: VoiceInputProps) {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleVoiceClick = useCallback(() => {
+    if (disabled) return;
     if (isListening) {
       // Stop listening
       setIsListening(false);
@@ -34,7 +36,7 @@ export default function VoiceInput({ onTranscript, className = "" }: VoiceInputP
       // Start listening
       setIsListening(true);
     }
-  }, [isListening, onTranscript]);
+  }, [disabled, isListening, onTranscript]);
 
   return (
     <div className={`relative ${className}`}>
@@ -42,8 +44,10 @@ export default function VoiceInput({ onTranscript, className = "" }: VoiceInputP
         onClick={handleVoiceClick}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
+        disabled={disabled}
         className={`
           relative p-2.5 rounded-lg border transition-all duration-200
+          ${disabled ? "opacity-50 cursor-not-allowed" : ""}
           ${isListening 
             ? "bg-intent-risk/10 border-intent-risk/30 text-intent-risk" 
             : isProcessing

@@ -1,12 +1,15 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { signals, Signal } from "@/data/mockData";
+import type { Signal } from "@/lib/api";
 import { MessageSquare, Mic, Image, Mail } from "lucide-react";
 import VoiceInput from "./VoiceInput";
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 
 interface SignalIngestProps {
+  signals: Signal[];
   selectedSignal: Signal | null;
   onSignalSelect: (signal: Signal) => void;
+  onVoiceTranscript?: (text: string) => Promise<Signal>;
+  isProcessing?: boolean;
 }
 
 const typeIcons = {
@@ -23,68 +26,75 @@ const typeLabels = {
   email: "Email Thread",
 };
 
-export default function SignalIngest({ selectedSignal, onSignalSelect }: SignalIngestProps) {
-  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
-
-  const handleVoiceTranscript = useCallback((text: string) => {
-    setVoiceTranscript(text);
-    // Create a mock signal from voice input
-    const voiceSignal: Signal = {
-      id: "voice-" + Date.now(),
-      type: "meeting",
-      title: "Voice Note",
-      source: "Voice Input",
-      timestamp: "Just now",
-      content: text,
-    };
-    onSignalSelect(voiceSignal);
-  }, [onSignalSelect]);
+export default function SignalIngest({ signals, selectedSignal, onSignalSelect, onVoiceTranscript, isProcessing }: SignalIngestProps) {
+  const handleVoiceTranscript = useCallback(async (text: string) => {
+    if (onVoiceTranscript) {
+      const voiceSignal = await onVoiceTranscript(text);
+      onSignalSelect(voiceSignal);
+    } else {
+      const voiceSignal: Signal = {
+        id: "voice-" + Date.now(),
+        type: "meeting",
+        title: "Voice Note",
+        source: "Voice Input",
+        timestamp: "Just now",
+        content: text,
+      };
+      onSignalSelect(voiceSignal);
+    }
+  }, [onSignalSelect, onVoiceTranscript]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-heading text-lg font-semibold text-foreground mb-1">Signal Ingest</h2>
-          <p className="text-xs text-muted-foreground">Select a signal or use voice input</p>
+          <p className="text-xs text-muted-foreground">Select a signal or use voice input {isProcessing && "(processing…)"}</p>
         </div>
-        <VoiceInput onTranscript={handleVoiceTranscript} />
+        <VoiceInput onTranscript={handleVoiceTranscript} disabled={isProcessing} />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        {signals.map((signal) => {
-          const Icon = typeIcons[signal.type];
-          const isSelected = selectedSignal?.id === signal.id;
+        {signals.length === 0 ? (
+          <div className="col-span-2 rounded-lg border border-dashed border-border bg-card/50 p-4 text-center text-xs text-muted-foreground">
+            No signals yet. Add a voice note to ingest new context.
+          </div>
+        ) : (
+          signals.map((signal) => {
+            const Icon = typeIcons[signal.type];
+            const isSelected = selectedSignal?.id === signal.id;
 
-          return (
-            <motion.button
-              key={signal.id}
-              onClick={() => onSignalSelect(signal)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={`
-                flex items-start gap-3 p-3 rounded-lg text-left transition-all duration-200
-                border
-                ${
-                  isSelected
-                    ? "border-glow bg-primary/5"
-                    : "border-border bg-card hover:border-muted-foreground/20 hover:bg-secondary/50"
-                }
-              `}
-            >
-              <div
-                className={`p-1.5 rounded-md ${
-                  isSelected ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"
-                }`}
+            return (
+              <motion.button
+                key={signal.id}
+                onClick={() => onSignalSelect(signal)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`
+                  flex items-start gap-3 p-3 rounded-lg text-left transition-all duration-200
+                  border
+                  ${
+                    isSelected
+                      ? "border-glow bg-primary/5"
+                      : "border-border bg-card hover:border-muted-foreground/20 hover:bg-secondary/50"
+                  }
+                `}
               >
-                <Icon className="w-3.5 h-3.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-medium text-foreground truncate">{typeLabels[signal.type]}</div>
-                <div className="text-[10px] text-muted-foreground truncate mt-0.5">{signal.source}</div>
-              </div>
-            </motion.button>
-          );
-        })}
+                <div
+                  className={`p-1.5 rounded-md ${
+                    isSelected ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-foreground truncate">{typeLabels[signal.type]}</div>
+                  <div className="text-[10px] text-muted-foreground truncate mt-0.5">{signal.source}</div>
+                </div>
+              </motion.button>
+            );
+          })
+        )}
       </div>
 
       <AnimatePresence mode="wait">

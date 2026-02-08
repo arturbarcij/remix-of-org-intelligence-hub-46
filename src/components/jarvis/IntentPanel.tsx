@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { classification, IntentType } from "@/data/mockData";
+import { classification as mockClassification } from "@/data/mockData";
+import type { Classification, IntentType } from "@/lib/api";
 import { Target, AlertTriangle, CheckSquare, Info, Zap } from "lucide-react";
 
 const intentConfig: Record<IntentType, { icon: typeof Target; label: string; colorClass: string }> = {
@@ -22,6 +23,7 @@ const itemVariants = {
 
 interface IntentPanelProps {
   isVisible: boolean;
+  classification?: Classification | null;
 }
 
 function ConfidenceBar({ value }: { value: number }) {
@@ -54,11 +56,13 @@ function EntityTag({ entity }: { entity: { name: string; role?: string; citation
   );
 }
 
-export default function IntentPanel({ isVisible }: IntentPanelProps) {
+export default function IntentPanel({ isVisible, classification: propClassification }: IntentPanelProps) {
   if (!isVisible) return null;
 
+  const classification = propClassification ?? mockClassification;
   const { primary, secondary, people, teams, topics, systems } = classification;
-  const PrimaryIcon = intentConfig[primary.intent].icon;
+  const primaryConfig = intentConfig[primary.intent] ?? intentConfig.fyi;
+  const PrimaryIcon = primaryConfig.icon;
 
   return (
     <motion.div
@@ -78,11 +82,11 @@ export default function IntentPanel({ isVisible }: IntentPanelProps) {
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Primary Intent</span>
         </div>
         <div className="flex items-center gap-3 mb-2">
-          <div className={`p-2 rounded-lg border ${intentConfig[primary.intent].colorClass}`}>
+          <div className={`p-2 rounded-lg border ${primaryConfig.colorClass}`}>
             <PrimaryIcon className="w-4 h-4" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-medium text-foreground">{intentConfig[primary.intent].label}</div>
+            <div className="text-sm font-medium text-foreground">{primaryConfig.label}</div>
             <ConfidenceBar value={primary.confidence} />
           </div>
         </div>
@@ -91,7 +95,7 @@ export default function IntentPanel({ isVisible }: IntentPanelProps) {
       {/* Secondary Intents */}
       <motion.div variants={itemVariants} className="flex gap-2">
         {secondary.map((s) => {
-          const config = intentConfig[s.intent];
+          const config = intentConfig[s.intent] ?? intentConfig.fyi;
           const Icon = config.icon;
           return (
             <div key={s.intent} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs ${config.colorClass}`}>
