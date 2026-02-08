@@ -16,6 +16,18 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function fetchAudio(path: string, init?: RequestInit): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...init?.headers },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
 export type IntentType = "decision" | "task" | "fyi" | "risk" | "conflict";
 export type ToolType = "slack" | "notion" | "linear" | "github" | "gmail";
 export type NodeType = "person" | "team" | "topic" | "decision" | "task" | "system";
@@ -117,6 +129,7 @@ export const api = {
   getActions: () => fetchApi<ActionItem[]>("/actions"),
   query: (q: string) => fetchApi<QueryResponse>("/query", { method: "POST", body: JSON.stringify({ query: q }) }),
   health: () => fetchApi<{ ok: boolean }>("/health"),
+  tts: (text: string) => fetchAudio("/tts", { method: "POST", body: JSON.stringify({ text }) }),
 };
 
 export async function isApiAvailable(): Promise<boolean> {

@@ -67,6 +67,7 @@ export default function SignalIngest({
   const [textSource, setTextSource] = useState("");
   const [textType, setTextType] = useState<Signal["type"]>("slack");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOcrRunning, setIsOcrRunning] = useState(false);
 
   const handleVoiceTranscript = useCallback(async (text: string) => {
     if (onVoiceTranscript) {
@@ -128,6 +129,37 @@ export default function SignalIngest({
     [isProcessing, isSubmitting, onSignalSelect, onTextSubmit]
   );
 
+  const handleScreenshotUpload = useCallback(
+    async (file: File | null) => {
+      if (!file || !onTextSubmit || isSubmitting || isProcessing) return;
+      setIsOcrRunning(true);
+      try {
+        const { default: Tesseract } = await import("tesseract.js");
+        const result = await Tesseract.recognize(file, "eng");
+        const extracted = (result?.data?.text || "").trim();
+        const content = extracted || "Screenshot uploaded (no text recognized).";
+        const saved = await onTextSubmit({
+          content,
+          title: "Screenshot Upload",
+          source: file.name || "Screenshot",
+          type: "screenshot",
+        });
+        onSignalSelect(saved);
+      } catch {
+        const saved = await onTextSubmit({
+          content: "Screenshot uploaded (OCR failed).",
+          title: "Screenshot Upload",
+          source: file.name || "Screenshot",
+          type: "screenshot",
+        });
+        onSignalSelect(saved);
+      } finally {
+        setIsOcrRunning(false);
+      }
+    },
+    [isProcessing, isSubmitting, onSignalSelect, onTextSubmit]
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -183,17 +215,29 @@ export default function SignalIngest({
           rows={3}
           className="w-full text-xs bg-secondary/40 border border-border rounded px-2 py-2 text-foreground placeholder:text-muted-foreground/60 outline-none resize-none"
         />
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <span className="text-[10px] text-muted-foreground">
             This will create a new signal and run the pipeline.
           </span>
-          <button
-            onClick={handleTextSubmit}
-            disabled={!textContent.trim() || isSubmitting || isProcessing}
-            className="text-[11px] px-2.5 py-1 rounded-md bg-primary text-primary-foreground disabled:opacity-40"
-          >
-            {isSubmitting ? "Adding..." : "Add Signal"}
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] px-2.5 py-1 rounded-md border border-border bg-secondary/40 text-foreground cursor-pointer">
+              {isOcrRunning ? "Scanning..." : "Upload Screenshot"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={isOcrRunning || isSubmitting || isProcessing}
+                onChange={(e) => handleScreenshotUpload(e.target.files?.[0] || null)}
+              />
+            </label>
+            <button
+              onClick={handleTextSubmit}
+              disabled={!textContent.trim() || isSubmitting || isProcessing}
+              className="text-[11px] px-2.5 py-1 rounded-md bg-primary text-primary-foreground disabled:opacity-40"
+            >
+              {isSubmitting ? "Adding..." : "Add Signal"}
+            </button>
+          </div>
         </div>
       </div>
 

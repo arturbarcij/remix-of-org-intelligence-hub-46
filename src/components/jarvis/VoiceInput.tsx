@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, Loader2 } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void | Promise<unknown>;
@@ -8,33 +8,72 @@ interface VoiceInputProps {
   disabled?: boolean;
 }
 
-const mockTranscripts = [
-  "Just had a call with the Acme team. They want to move the deadline up by two weeks.",
-  "Quick update — the SOC2 audit results are in. Three critical findings.",
-  "Can someone check with Marcus about the engineer reallocation?",
-  "The board meeting has been moved to Friday. Need to update the deck.",
-];
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: unknown) => void) | null;
+  onerror: ((event: unknown) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
 
 export default function VoiceInput({ onTranscript, className = "", disabled = false }: VoiceInputProps) {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const supportsSpeech = useRef(false);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike })
+      .SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+      recognitionRef.current = recognition;
+      supportsSpeech.current = true;
+    }
+  }, []);
 
   const handleVoiceClick = useCallback(() => {
     if (disabled) return;
     if (isListening) {
       // Stop listening
       setIsListening(false);
-      setIsProcessing(true);
-      
-      // Simulate processing and return mock transcript
-      setTimeout(() => {
-        const randomTranscript = mockTranscripts[Math.floor(Math.random() * mockTranscripts.length)];
-        onTranscript(randomTranscript);
-        setIsProcessing(false);
-      }, 1500);
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
     } else {
       // Start listening
       setIsListening(true);
+      if (supportsSpeech.current && recognitionRef.current) {
+        setIsProcessing(false);
+        recognitionRef.current.onresult = (event: unknown) => {
+          const e = event as { results?: { 0?: { 0?: { transcript?: string } } } };
+          const transcript = e?.results?.[0]?.[0]?.transcript?.trim() || "";
+          if (transcript) {
+            onTranscript(transcript);
+          }
+        };
+        recognitionRef.current.onerror = () => {
+          setIsListening(false);
+          setIsProcessing(false);
+        };
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+        recognitionRef.current.start();
+      } else {
+        setIsProcessing(true);
+        setTimeout(() => {
+          onTranscript("Captured voice input from browser.");
+          setIsProcessing(false);
+          setIsListening(false);
+        }, 1200);
+      }
     }
   }, [disabled, isListening, onTranscript]);
 

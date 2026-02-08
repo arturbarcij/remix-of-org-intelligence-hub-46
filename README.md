@@ -45,6 +45,7 @@ The frontend proxies `/api` to the local JARVIS API server on port 3001.
 npm --prefix server install
 copy server\\.env.example server\\.env
 # Add OPENROUTER_API_KEY to server\\.env (and optionally OPENROUTER_MODEL)
+# Optional: add ELEVENLABS_API_KEY + ELEVENLABS_VOICE_ID for TTS
 npm run server:dev
 ```
 

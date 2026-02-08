@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { getSignals, addSignal, getState, saveState } = require('./lib/storage');
 const ai = require('./lib/aiPipeline');
+const { textToSpeech } = require('./lib/elevenlabs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -54,6 +55,83 @@ app.post('/api/signals', (req, res) => {
       content: body.content || body.summary || JSON.stringify(body),
     };
     const saved = addSignal(signal);
+    res.status(201).json(saved);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── Ingest helpers (Slack / Email / Meeting / Screenshot) ─────
+function saveSignalFromPayload(payload) {
+  const signal = {
+    id: payload.id || `sig_${Date.now()}`,
+    type: payload.type || 'slack',
+    title: payload.title || 'New Signal',
+    source: payload.source || 'Unknown',
+    timestamp: payload.timestamp || new Date().toISOString(),
+    content: payload.content || payload.summary || JSON.stringify(payload),
+  };
+  return addSignal(signal);
+}
+
+app.post('/api/ingest/slack', (req, res) => {
+  try {
+    const { text, user, channel, ts } = req.body || {};
+    const saved = saveSignalFromPayload({
+      type: 'slack',
+      title: channel ? `#${channel}` : 'Slack Message',
+      source: user || 'Slack',
+      timestamp: ts ? new Date(Number(ts) * 1000).toISOString() : new Date().toISOString(),
+      content: text || '',
+    });
+    res.status(201).json(saved);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/ingest/email', (req, res) => {
+  try {
+    const { subject, from, body, timestamp } = req.body || {};
+    const saved = saveSignalFromPayload({
+      type: 'email',
+      title: subject || 'Email Thread',
+      source: from || 'Email',
+      timestamp: timestamp || new Date().toISOString(),
+      content: body || '',
+    });
+    res.status(201).json(saved);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/ingest/meeting', (req, res) => {
+  try {
+    const { title, participants, transcript, timestamp } = req.body || {};
+    const saved = saveSignalFromPayload({
+      type: 'meeting',
+      title: title || 'Meeting Transcript',
+      source: participants ? `Participants: ${participants}` : 'Meeting',
+      timestamp: timestamp || new Date().toISOString(),
+      content: transcript || '',
+    });
+    res.status(201).json(saved);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/ingest/screenshot', (req, res) => {
+  try {
+    const { title, source, text, timestamp } = req.body || {};
+    const saved = saveSignalFromPayload({
+      type: 'screenshot',
+      title: title || 'Screenshot',
+      source: source || 'Screenshot',
+      timestamp: timestamp || new Date().toISOString(),
+      content: text || '',
+    });
     res.status(201).json(saved);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -229,6 +307,19 @@ app.post('/api/process/:signalId?', async (req, res) => {
 // Health
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
+});
+
+// TTS
+app.post('/api/tts', async (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (!text) return res.status(400).json({ error: 'Missing text' });
+    const audio = await textToSpeech(text);
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.send(audio);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.listen(PORT, () => {
