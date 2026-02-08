@@ -14,30 +14,117 @@ interface VoiceInputProps {
 export default function VoiceInput({ onTranscript, onPartial, className = "", disabled = false }: VoiceInputProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [desiredListening, setDesiredListening] = useState(false);
   const transcriptRef = useRef("");
+  const fallbackTimerRef = useRef<number | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const fallbackActiveRef = useRef(false);
 
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
     commitStrategy: CommitStrategy.VAD,
     onPartialTranscript: (data) => {
       transcriptRef.current = data.text;
-      onPartial?.(data.text);
+      if (data.text?.trim()) {
+        onPartial?.(data.text.trim());
+      }
     },
     onCommittedTranscript: (data) => {
       if (data.text.trim()) {
         onTranscript(data.text.trim());
+        onPartial?.("");
       }
     },
   });
 
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognitionRef.current = recognition;
+  }, []);
+
+  const stopBrowserRecognition = useCallback(() => {
+    if (recognitionRef.current && fallbackActiveRef.current) {
+      fallbackActiveRef.current = false;
+      recognitionRef.current.onresult = null;
+      recognitionRef.current.onerror = null;
+      recognitionRef.current.onend = null;
+      recognitionRef.current.stop();
+    }
+  }, []);
+
+  const startBrowserRecognition = useCallback(() => {
+    const recognition = recognitionRef.current;
+    if (!recognition || fallbackActiveRef.current) return;
+    fallbackActiveRef.current = true;
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const last = event.results[event.results.length - 1];
+      const transcript = last?.[0]?.transcript?.trim() || "";
+      if (!transcript) return;
+      if (last.isFinal) {
+        onTranscript(transcript);
+        onPartial?.("");
+      } else {
+        onPartial?.(transcript);
+      }
+    };
+    recognition.onerror = () => {
+      onPartial?.("");
+    };
+    recognition.onend = () => {
+      if (fallbackActiveRef.current && desiredListening) {
+        recognition.start();
+      }
+    };
+    recognition.start();
+  }, [desiredListening, onPartial, onTranscript]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
+      if (fallbackTimerRef.current) {
+        window.clearTimeout(fallbackTimerRef.current);
+      }
+      stopBrowserRecognition();
       if (scribe.isConnected) {
         scribe.disconnect();
       }
     };
-  }, [scribe]);
+  }, [scribe, stopBrowserRecognition]);
+
+  const connectScribe = useCallback(async () => {
+    setIsProcessing(true);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke("elevenlabs-scribe-token");
+      if (invokeError) {
+        throw new Error(invokeError.message || "Failed to get scribe token");
+      }
+      if (!data?.token) {
+        throw new Error("No token received");
+      }
+      transcriptRef.current = "";
+      await scribe.connect({
+        token: data.token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      setIsProcessing(false);
+      setError(null);
+      stopBrowserRecognition();
+    } catch (err) {
+      console.error("Voice input error:", err);
+      setError(err instanceof Error ? err.message : "Voice input failed");
+      setIsProcessing(false);
+      setDesiredListening(false);
+      startBrowserRecognition();
+    }
+  }, [scribe, startBrowserRecognition, stopBrowserRecognition]);
 
   const handleVoiceClick = useCallback(async () => {
     if (disabled) return;
@@ -47,39 +134,29 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
       // Stop listening
       scribe.disconnect();
       setIsProcessing(false);
+      setDesiredListening(false);
+      stopBrowserRecognition();
     } else {
       // Start listening
-      setIsProcessing(true);
-      try {
-        // Fetch token from edge function using supabase client
-        const { data, error: invokeError } = await supabase.functions.invoke("elevenlabs-scribe-token");
-
-        if (invokeError) {
-          throw new Error(invokeError.message || "Failed to get scribe token");
-        }
-
-        if (!data?.token) {
-          throw new Error("No token received");
-        }
-
-        transcriptRef.current = "";
-
-        await scribe.connect({
-          token: data.token,
-          microphone: {
-            echoCancellation: true,
-            noiseSuppression: true,
-          },
-        });
-
-        setIsProcessing(false);
-      } catch (err) {
-        console.error("Voice input error:", err);
-        setError(err instanceof Error ? err.message : "Voice input failed");
-        setIsProcessing(false);
+      setDesiredListening(true);
+      if (fallbackTimerRef.current) {
+        window.clearTimeout(fallbackTimerRef.current);
       }
+      fallbackTimerRef.current = window.setTimeout(() => {
+        if (!scribe.isConnected) {
+          startBrowserRecognition();
+        }
+      }, 800);
+      await connectScribe();
     }
-  }, [disabled, scribe, onTranscript]);
+  }, [disabled, scribe, connectScribe, startBrowserRecognition, stopBrowserRecognition]);
+
+  useEffect(() => {
+    if (!desiredListening) return;
+    if (!scribe.isConnected && !isProcessing) {
+      connectScribe();
+    }
+  }, [desiredListening, scribe.isConnected, isProcessing, connectScribe]);
 
   const isListening = scribe.isConnected;
 
