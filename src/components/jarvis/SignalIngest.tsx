@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { signals, Signal } from "@/data/mockData";
 import { MessageSquare, Mic, Image, Mail } from "lucide-react";
+import VoiceInput from "./VoiceInput";
+import { useState, useCallback } from "react";
 
 interface SignalIngestProps {
   selectedSignal: Signal | null;
@@ -22,11 +24,30 @@ const typeLabels = {
 };
 
 export default function SignalIngest({ selectedSignal, onSignalSelect }: SignalIngestProps) {
+  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
+
+  const handleVoiceTranscript = useCallback((text: string) => {
+    setVoiceTranscript(text);
+    // Create a mock signal from voice input
+    const voiceSignal: Signal = {
+      id: "voice-" + Date.now(),
+      type: "meeting",
+      title: "Voice Note",
+      source: "Voice Input",
+      timestamp: "Just now",
+      content: text,
+    };
+    onSignalSelect(voiceSignal);
+  }, [onSignalSelect]);
+
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="font-heading text-lg font-semibold text-foreground mb-1">Signal Ingest</h2>
-        <p className="text-xs text-muted-foreground">Select a signal to process</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-heading text-lg font-semibold text-foreground mb-1">Signal Ingest</h2>
+          <p className="text-xs text-muted-foreground">Select a signal or use voice input</p>
+        </div>
+        <VoiceInput onTranscript={handleVoiceTranscript} />
       </div>
 
       <div className="grid grid-cols-2 gap-2">

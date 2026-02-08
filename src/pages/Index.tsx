@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, RotateCcw, Zap, ChevronRight } from "lucide-react";
+import { Play, Pause, RotateCcw, Zap, ChevronRight, Users, UserPlus } from "lucide-react";
 import PipelineBar from "@/components/jarvis/PipelineBar";
 import SignalIngest from "@/components/jarvis/SignalIngest";
 import IntentPanel from "@/components/jarvis/IntentPanel";
@@ -9,6 +9,8 @@ import TruthPanel from "@/components/jarvis/TruthPanel";
 import ConflictAlert from "@/components/jarvis/ConflictAlert";
 import ActionPanel from "@/components/jarvis/ActionPanel";
 import ExecQuery from "@/components/jarvis/ExecQuery";
+import StakeholderMap from "@/components/jarvis/StakeholderMap";
+import NewStakeholderContext from "@/components/jarvis/NewStakeholderContext";
 import { Signal, signals, pipelineSteps } from "@/data/mockData";
 
 const DEMO_DELAYS = [1500, 2500, 2000, 2500, 2000, 1500, 2000];
@@ -19,6 +21,8 @@ export default function Index() {
   const [showGraphAfter, setShowGraphAfter] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
   const [showPipeline, setShowPipeline] = useState(false);
+  const [showStakeholderMap, setShowStakeholderMap] = useState(false);
+  const [showNewStakeholder, setShowNewStakeholder] = useState(false);
 
   // Demo auto-advance
   useEffect(() => {
@@ -81,6 +85,8 @@ export default function Index() {
     setShowGraphAfter(false);
     setDemoMode(false);
     setShowPipeline(false);
+    setShowStakeholderMap(false);
+    setShowNewStakeholder(false);
   }, []);
 
   const handleStartDemo = useCallback(() => {
@@ -116,7 +122,34 @@ export default function Index() {
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowStakeholderMap(!showStakeholderMap)}
+              className={`
+                p-1.5 rounded-md transition-colors
+                ${showStakeholderMap 
+                  ? "bg-primary/15 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }
+              `}
+              title="Stakeholder Map"
+            >
+              <Users className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setShowNewStakeholder(!showNewStakeholder)}
+              className={`
+                p-1.5 rounded-md transition-colors
+                ${showNewStakeholder 
+                  ? "bg-primary/15 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }
+              `}
+              title="New Stakeholder Context"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+            </button>
+            <div className="w-px h-4 bg-border mx-1 hidden sm:block" />
             <button
               onClick={() => setShowPipeline(!showPipeline)}
               className="text-[10px] text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md hover:bg-secondary transition-colors hidden sm:block"
@@ -225,6 +258,23 @@ export default function Index() {
           </motion.div>
         )}
 
+        {/* New Stakeholder Context (full-width) */}
+        <AnimatePresence>
+          {showNewStakeholder && (step >= 0 || selectedSignal) && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-6"
+            >
+              <NewStakeholderContext 
+                isVisible={true} 
+                onClose={() => setShowNewStakeholder(false)} 
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Step content */}
         {(step >= 0 || selectedSignal) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -238,6 +288,19 @@ export default function Index() {
               <IntentPanel isVisible={step >= 1} />
 
               <ConflictAlert isVisible={step >= 4} />
+
+              {/* Stakeholder Map - Left column when enabled */}
+              <AnimatePresence>
+                {showStakeholderMap && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <StakeholderMap isVisible={true} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Right column: Graph + Truth + Actions + Query */}
