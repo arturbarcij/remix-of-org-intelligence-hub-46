@@ -76,6 +76,26 @@ export default function SignalIngest({
     []
   );
 
+  const handleTextSubmit = useCallback(async () => {
+    if (!onTextSubmit || !textContent.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const saved = await onTextSubmit({
+        content: textContent.trim(),
+        title: textTitle.trim() || "Manual Ingest",
+        source: textSource.trim() || "User Input",
+        type: textType,
+      });
+      onSignalSelect(saved);
+      setTextContent("");
+      setTextTitle("");
+      setTextSource("");
+      setTextType("slack");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [isSubmitting, onTextSubmit, onSignalSelect, textContent, textSource, textTitle, textType]);
+
   const applyTranscriptToFields = useCallback(
     (transcript: string, opts?: { allowSubmit?: boolean; isPartial?: boolean }) => {
       const text = transcript.trim();
@@ -157,26 +177,6 @@ export default function SignalIngest({
     },
     [applyTranscriptToFields, voiceMode]
   );
-
-  const handleTextSubmit = useCallback(async () => {
-    if (!onTextSubmit || !textContent.trim() || isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      const saved = await onTextSubmit({
-        content: textContent.trim(),
-        title: textTitle.trim() || "Manual Ingest",
-        source: textSource.trim() || "User Input",
-        type: textType,
-      });
-      onSignalSelect(saved);
-      setTextContent("");
-      setTextTitle("");
-      setTextSource("");
-      setTextType("slack");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [isSubmitting, onTextSubmit, onSignalSelect, textContent, textSource, textTitle, textType]);
 
   const handlePreset = useCallback(
     async (preset: (typeof presets)[number]) => {
