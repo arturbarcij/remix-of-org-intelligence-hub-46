@@ -69,6 +69,7 @@ export default function SignalIngest({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [voiceMode, setVoiceMode] = useState<"fields" | "signal">("fields");
+  const [liveTranscript, setLiveTranscript] = useState("");
 
   const voiceHint = useMemo(
     () => 'Say: "title ... source ... type ... message ..." (or just dictate message)',
@@ -76,7 +77,7 @@ export default function SignalIngest({
   );
 
   const applyTranscriptToFields = useCallback(
-    (transcript: string) => {
+    (transcript: string, opts?: { allowSubmit?: boolean; isPartial?: boolean }) => {
       const text = transcript.trim();
       if (!text) return;
 
@@ -106,16 +107,20 @@ export default function SignalIngest({
         return;
       }
 
-      if (/\b(add signal|submit|send)\b/i.test(text)) {
+      if (opts?.allowSubmit !== false && /\b(add signal|submit|send)\b/i.test(text)) {
         handleTextSubmit();
         return;
       }
 
       if (!titleSeg && !sourceSeg && !typeSeg) {
-        setTextContent((prev) => (prev ? `${prev} ${text}` : text));
+        if (opts?.isPartial) {
+          setTextContent(text);
+        } else {
+          setTextContent((prev) => (prev ? `${prev} ${text}` : text));
+        }
       }
     },
-    []
+    [handleTextSubmit]
   );
 
   const handleVoiceTranscript = useCallback(async (text: string) => {
@@ -136,8 +141,22 @@ export default function SignalIngest({
       }
       return;
     }
-    applyTranscriptToFields(text);
+    applyTranscriptToFields(text, { allowSubmit: true, isPartial: false });
   }, [applyTranscriptToFields, onSignalSelect, onVoiceTranscript, voiceMode]);
+
+  const handleVoicePartial = useCallback(
+    (text: string) => {
+      if (!text) {
+        setLiveTranscript("");
+        return;
+      }
+      setLiveTranscript(text);
+      if (voiceMode === "fields") {
+        applyTranscriptToFields(text, { allowSubmit: false, isPartial: true });
+      }
+    },
+    [applyTranscriptToFields, voiceMode]
+  );
 
   const handleTextSubmit = useCallback(async () => {
     if (!onTextSubmit || !textContent.trim() || isSubmitting) return;
@@ -233,7 +252,7 @@ export default function SignalIngest({
               <span>{voiceMode === "fields" ? "to fields" : "as signal"}</span>
             </label>
           </div>
-          <VoiceInput onTranscript={handleVoiceTranscript} disabled={isProcessing} />
+          <VoiceInput onTranscript={handleVoiceTranscript} onPartial={handleVoicePartial} disabled={isProcessing} />
         </div>
       </div>
 
@@ -307,6 +326,11 @@ export default function SignalIngest({
             </button>
           </div>
         </div>
+        {liveTranscript && (
+          <div className="text-[10px] text-muted-foreground">
+            Live: <span className="font-mono">{liveTranscript}</span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2">
