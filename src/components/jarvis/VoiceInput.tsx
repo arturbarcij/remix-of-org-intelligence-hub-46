@@ -14,14 +14,11 @@ interface VoiceInputProps {
 export default function VoiceInput({ onTranscript, onPartial, className = "", disabled = false }: VoiceInputProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [desiredListening, setDesiredListening] = useState(false);
   const [isPushToTalk, setIsPushToTalk] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  
   const transcriptRef = useRef("");
-  const fallbackTimerRef = useRef<number | null>(null);
-  const fallbackNoResultRef = useRef<number | null>(null);
-  const recognitionRef = useRef<any>(null);
-  const fallbackActiveRef = useRef(false);
-  const lastTranscriptAtRef = useRef<number | null>(null);
+  const connectingRef = useRef(false);
   const spaceDownRef = useRef(false);
   const mouseDownRef = useRef(false);
 
@@ -42,102 +39,62 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
     },
   });
 
+  // Sync scribe connection state
   useEffect(() => {
-    const SpeechRecognitionCtor =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionCtor) return;
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-    recognitionRef.current = recognition;
-  }, []);
-
-  const stopBrowserRecognition = useCallback(() => {
-    if (recognitionRef.current && fallbackActiveRef.current) {
-      fallbackActiveRef.current = false;
-      lastTranscriptAtRef.current = null;
-      recognitionRef.current.onresult = null;
-      recognitionRef.current.onerror = null;
-      recognitionRef.current.onend = null;
-      recognitionRef.current.stop();
-    }
-  }, []);
-
-  const startBrowserRecognition = useCallback(() => {
-    const recognition = recognitionRef.current;
-    if (!recognition || fallbackActiveRef.current) return;
-    fallbackActiveRef.current = true;
-    recognition.onresult = (event: any) => {
-      const last = event.results[event.results.length - 1];
-      const transcript = last?.[0]?.transcript?.trim() || "";
-      if (!transcript) return;
-      lastTranscriptAtRef.current = Date.now();
-      if (last.isFinal) {
-        onTranscript(transcript);
-        onPartial?.("");
-      } else {
-        onPartial?.(transcript);
-      }
-    };
-    recognition.onerror = (e: any) => {
-      onPartial?.("");
-      // Auto-cancel on permission denied
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        setError("Mic permission denied");
-        stopListening();
-      }
-    };
-    recognition.onend = () => {
-      if (!fallbackActiveRef.current || !desiredListening) return;
-      const lastAt = lastTranscriptAtRef.current;
-      if (lastAt && Date.now() - lastAt < 5000) {
-        recognition.start();
-      } else {
-        fallbackActiveRef.current = false;
-      }
-    };
-    recognition.start();
-  }, [desiredListening, onPartial, onTranscript]);
-
-  const stopListening = useCallback(() => {
-    setDesiredListening(false);
-    setIsPushToTalk(false);
-    setIsProcessing(false);
-    stopBrowserRecognition();
+    setIsListening(scribe.isConnected);
     if (scribe.isConnected) {
-      scribe.disconnect();
+      setIsProcessing(false);
+      connectingRef.current = false;
     }
-    onPartial?.("");
-  }, [scribe, stopBrowserRecognition, onPartial]);
+  }, [scribe.isConnected]);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      if (fallbackTimerRef.current) {
-        window.clearTimeout(fallbackTimerRef.current);
-      }
-      if (fallbackNoResultRef.current) {
-        window.clearTimeout(fallbackNoResultRef.current);
-      }
-      stopBrowserRecognition();
       if (scribe.isConnected) {
         scribe.disconnect();
       }
     };
-  }, [scribe, stopBrowserRecognition]);
+  }, [scribe]);
 
-  const connectScribe = useCallback(async () => {
+  const stopListening = useCallback(() => {
+    setIsPushToTalk(false);
+    setIsProcessing(false);
+    setIsListening(false);
+    connectingRef.current = false;
+    onPartial?.("");
+    
+    if (scribe.isConnected) {
+      scribe.disconnect();
+    }
+  }, [scribe, onPartial]);
+
+  const startListening = useCallback(async (pushToTalk = false) => {
+    // Prevent multiple concurrent connection attempts
+    if (disabled || connectingRef.current || scribe.isConnected) {
+      return;
+    }
+    
+    connectingRef.current = true;
+    setError(null);
     setIsProcessing(true);
+    setIsPushToTalk(pushToTalk);
+
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("elevenlabs-scribe-token");
+      
       if (invokeError) {
         throw new Error(invokeError.message || "Failed to get scribe token");
       }
       if (!data?.token) {
         throw new Error("No token received");
       }
+
+      // Double-check we're still supposed to be connecting
+      if (!connectingRef.current) {
+        return;
+      }
+
       transcriptRef.current = "";
       await scribe.connect({
         token: data.token,
@@ -146,54 +103,40 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
           noiseSuppression: true,
         },
       });
-      setIsProcessing(false);
+
       setError(null);
-      stopBrowserRecognition();
     } catch (err: any) {
       console.error("Voice input error:", err);
+      
       // Auto-cancel on permission denied
       if (err?.name === "NotAllowedError" || err?.message?.includes("permission")) {
         setError("Mic permission denied");
       } else {
         setError(err instanceof Error ? err.message : "Voice input failed");
       }
-      setIsProcessing(false);
+      
       stopListening();
     }
-  }, [scribe, stopBrowserRecognition, stopListening]);
+  }, [disabled, scribe, stopListening]);
 
-  const startListening = useCallback(async (pushToTalk = false) => {
-    if (disabled) return;
-    setError(null);
-    setDesiredListening(true);
-    setIsPushToTalk(pushToTalk);
-    startBrowserRecognition();
-    if (fallbackTimerRef.current) window.clearTimeout(fallbackTimerRef.current);
-    if (fallbackNoResultRef.current) window.clearTimeout(fallbackNoResultRef.current);
-    fallbackNoResultRef.current = window.setTimeout(() => {
-      if (!lastTranscriptAtRef.current && !scribe.isConnected) {
-        setError("Mic permission required");
-        stopListening();
-      }
-    }, 3000);
-    await connectScribe();
-  }, [disabled, connectScribe, startBrowserRecognition, stopListening, scribe.isConnected]);
-
+  // Toggle click handler
   const handleVoiceClick = useCallback(async () => {
     if (disabled) return;
-    if (scribe.isConnected || desiredListening) {
+    
+    if (scribe.isConnected || isProcessing) {
       stopListening();
     } else {
       await startListening(false);
     }
-  }, [disabled, scribe.isConnected, desiredListening, stopListening, startListening]);
+  }, [disabled, scribe.isConnected, isProcessing, stopListening, startListening]);
 
   // Push-to-talk: mouse/touch hold on button
-  const handleMouseDown = useCallback(async () => {
-    if (disabled || mouseDownRef.current) return;
+  const handleMouseDown = useCallback(async (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (disabled || mouseDownRef.current || scribe.isConnected || connectingRef.current) return;
     mouseDownRef.current = true;
     await startListening(true);
-  }, [disabled, startListening]);
+  }, [disabled, scribe.isConnected, startListening]);
 
   const handleMouseUp = useCallback(() => {
     if (!mouseDownRef.current) return;
@@ -213,7 +156,7 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
       
-      if (!spaceDownRef.current && !desiredListening) {
+      if (!spaceDownRef.current && !scribe.isConnected && !connectingRef.current) {
         e.preventDefault();
         spaceDownRef.current = true;
         await startListening(true);
@@ -237,16 +180,7 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [disabled, desiredListening, isPushToTalk, startListening, stopListening]);
-
-  useEffect(() => {
-    if (!desiredListening) return;
-    if (!scribe.isConnected && !isProcessing) {
-      connectScribe();
-    }
-  }, [desiredListening, scribe.isConnected, isProcessing, connectScribe]);
-
-  const isListening = scribe.isConnected;
+  }, [disabled, scribe.isConnected, isPushToTalk, startListening, stopListening]);
 
   // Status text
   const getStatusText = () => {
