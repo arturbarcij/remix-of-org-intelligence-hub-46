@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, RotateCcw, Zap, ChevronRight, Users, UserPlus } from "lucide-react";
+import { Play, Pause, RotateCcw, Zap, ChevronRight, Users, UserPlus, Activity, EyeOff, Keyboard } from "lucide-react";
 import PipelineBar from "@/components/jarvis/PipelineBar";
 import SignalIngest from "@/components/jarvis/SignalIngest";
 import IntentPanel from "@/components/jarvis/IntentPanel";
@@ -11,6 +11,9 @@ import ActionPanel from "@/components/jarvis/ActionPanel";
 import ExecQuery from "@/components/jarvis/ExecQuery";
 import StakeholderMap from "@/components/jarvis/StakeholderMap";
 import NewStakeholderContext from "@/components/jarvis/NewStakeholderContext";
+import InformationFlow from "@/components/jarvis/InformationFlow";
+import BlindSpots from "@/components/jarvis/BlindSpots";
+import AgentThinking from "@/components/jarvis/AgentThinking";
 import { Signal, signals, pipelineSteps } from "@/data/mockData";
 
 const DEMO_DELAYS = [1500, 2500, 2000, 2500, 2000, 1500, 2000];
@@ -23,6 +26,68 @@ export default function Index() {
   const [showPipeline, setShowPipeline] = useState(false);
   const [showStakeholderMap, setShowStakeholderMap] = useState(false);
   const [showNewStakeholder, setShowNewStakeholder] = useState(false);
+  const [showInfoFlow, setShowInfoFlow] = useState(false);
+  const [showBlindSpots, setShowBlindSpots] = useState(false);
+  const [showAgentThinking, setShowAgentThinking] = useState(false);
+  const [showKeyboardHints, setShowKeyboardHints] = useState(false);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.key.toLowerCase()) {
+        case " ": // Space to advance
+          e.preventDefault();
+          if (step >= 0 && step < pipelineSteps.length - 1 && selectedSignal) {
+            if (step === 1) setShowGraphAfter(false);
+            setStep((s) => s + 1);
+          } else if (step === -1) {
+            setSelectedSignal(signals[0]);
+            setStep(0);
+          }
+          break;
+        case "r": // R to reset
+          setStep(-1);
+          setSelectedSignal(null);
+          setShowGraphAfter(false);
+          setDemoMode(false);
+          setShowPipeline(false);
+          setShowStakeholderMap(false);
+          setShowNewStakeholder(false);
+          setShowInfoFlow(false);
+          setShowBlindSpots(false);
+          setShowAgentThinking(false);
+          break;
+        case "d": // D to toggle demo mode
+          if (!demoMode) {
+            setStep(-1);
+            setSelectedSignal(null);
+            setShowGraphAfter(false);
+            setTimeout(() => setDemoMode(true), 100);
+          } else {
+            setDemoMode(false);
+          }
+          break;
+        case "a": // A to toggle agent thinking
+          setShowAgentThinking((v) => !v);
+          break;
+        case "f": // F to toggle info flow
+          setShowInfoFlow((v) => !v);
+          break;
+        case "b": // B to toggle blind spots
+          setShowBlindSpots((v) => !v);
+          break;
+        case "?": // ? to show keyboard hints
+          setShowKeyboardHints((v) => !v);
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [step, demoMode, selectedSignal]);
 
   // Demo auto-advance
   useEffect(() => {
@@ -87,6 +152,9 @@ export default function Index() {
     setShowPipeline(false);
     setShowStakeholderMap(false);
     setShowNewStakeholder(false);
+    setShowInfoFlow(false);
+    setShowBlindSpots(false);
+    setShowAgentThinking(false);
   }, []);
 
   const handleStartDemo = useCallback(() => {
@@ -123,6 +191,32 @@ export default function Index() {
 
           {/* Controls */}
           <div className="flex items-center gap-1 sm:gap-1.5">
+            <button
+              onClick={() => setShowInfoFlow(!showInfoFlow)}
+              className={`
+                p-1.5 rounded-md transition-colors
+                ${showInfoFlow 
+                  ? "bg-primary/15 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }
+              `}
+              title="Information Flow (F)"
+            >
+              <Activity className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setShowBlindSpots(!showBlindSpots)}
+              className={`
+                p-1.5 rounded-md transition-colors
+                ${showBlindSpots 
+                  ? "bg-primary/15 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }
+              `}
+              title="Blind Spots (B)"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+            </button>
             <button
               onClick={() => setShowStakeholderMap(!showStakeholderMap)}
               className={`
@@ -164,15 +258,34 @@ export default function Index() {
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => setShowPipeline(!showPipeline)}
-              className="text-[10px] text-muted-foreground hover:text-foreground px-2 sm:px-2.5 py-1.5 rounded-md hover:bg-secondary transition-colors hidden lg:block"
+              onClick={() => setShowAgentThinking(!showAgentThinking)}
+              className={`
+                text-[10px] px-2 sm:px-2.5 py-1.5 rounded-md transition-colors hidden lg:block
+                ${showAgentThinking 
+                  ? "bg-primary/15 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }
+              `}
             >
-              How it thinks
+              How it thinks (A)
+            </button>
+            <button
+              onClick={() => setShowKeyboardHints(!showKeyboardHints)}
+              className={`
+                p-1.5 rounded-md transition-colors hidden sm:block
+                ${showKeyboardHints 
+                  ? "bg-primary/15 text-primary" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }
+              `}
+              title="Keyboard Shortcuts (?)"
+            >
+              <Keyboard className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={handleReset}
               className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              title="Reset"
+              title="Reset (R)"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -187,11 +300,45 @@ export default function Index() {
               `}
             >
               {demoMode ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              <span className="hidden xs:inline">{demoMode ? "Pause" : "Demo"}</span>
+              <span className="hidden xs:inline">{demoMode ? "Pause" : "Demo (D)"}</span>
             </button>
           </div>
         </div>
       </header>
+
+      {/* Keyboard hints overlay */}
+      <AnimatePresence>
+        {showKeyboardHints && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="fixed top-16 right-4 z-50 w-56 rounded-lg border border-border bg-card shadow-lg p-3"
+          >
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+              Keyboard Shortcuts
+            </div>
+            <div className="space-y-1.5 text-xs">
+              {[
+                { key: "Space", action: "Next step" },
+                { key: "D", action: "Toggle demo" },
+                { key: "R", action: "Reset" },
+                { key: "A", action: "Agent thinking" },
+                { key: "F", action: "Info flow" },
+                { key: "B", action: "Blind spots" },
+                { key: "?", action: "This menu" },
+              ].map((item) => (
+                <div key={item.key} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{item.action}</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-secondary text-foreground font-mono text-[10px]">
+                    {item.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Pipeline visualization - scrollable on mobile */}
       <AnimatePresence>
@@ -236,6 +383,23 @@ export default function Index() {
         )}
       </AnimatePresence>
 
+      {/* Agent Thinking Panel */}
+      <AnimatePresence>
+        {showAgentThinking && step >= 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden border-b border-border"
+          >
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+              <AgentThinking currentStep={step} isVisible={true} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main content */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 md:px-6 py-4 sm:py-6">
         {/* Landing state */}
@@ -269,6 +433,9 @@ export default function Index() {
                 Try It
               </button>
             </div>
+            <div className="mt-6 text-[10px] text-muted-foreground">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-secondary font-mono">Space</kbd> to start, <kbd className="px-1.5 py-0.5 rounded bg-secondary font-mono">?</kbd> for shortcuts
+            </div>
           </motion.div>
         )}
 
@@ -289,6 +456,20 @@ export default function Index() {
           )}
         </AnimatePresence>
 
+        {/* Information Flow Panel (full-width when visible) */}
+        <AnimatePresence>
+          {showInfoFlow && (step >= 0 || selectedSignal) && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-6"
+            >
+              <InformationFlow isVisible={true} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Step content */}
         {(step >= 0 || selectedSignal) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pb-20 sm:pb-6">
@@ -302,6 +483,19 @@ export default function Index() {
               <IntentPanel isVisible={step >= 1} />
 
               <ConflictAlert isVisible={step >= 4} />
+
+              {/* Blind Spots - Left column when enabled */}
+              <AnimatePresence>
+                {showBlindSpots && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <BlindSpots isVisible={true} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Stakeholder Map - Left column when enabled */}
               <AnimatePresence>
