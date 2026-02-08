@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { api, isApiAvailable } from "@/lib/api";
-import type { ProcessResponse, QueryResponse, Signal } from "@/lib/api";
+import type { ProcessResponse, QueryResponse, Signal, Classification } from "@/lib/api";
 import {
   signals as mockSignals,
   classification as mockClassification,
@@ -11,6 +11,7 @@ import {
   actions as mockActions,
   execQueryResponse as mockQueryResponse,
 } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface PipelineData {
   classification: ProcessResponse["classification"] | null;
@@ -22,13 +23,46 @@ export interface PipelineData {
 }
 
 const defaultPipeline: PipelineData = {
-  classification: mockClassification,
+  classification: null,
   graphBefore: mockGraphBefore,
   graphAfter: mockGraphAfter,
-  truthVersions: mockTruthVersions,
-  conflicts: mockConflicts,
-  actions: mockActions,
+  truthVersions: [],
+  conflicts: [],
+  actions: [],
 };
+
+async function classifySignalWithAI(signal: Signal): Promise<Classification | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke("classify-signal", {
+      body: { signal },
+    });
+
+    if (error) {
+      console.error("Classification error:", error);
+      return null;
+    }
+
+    if (data?.classification) {
+      // Map AI response to our Classification type
+      const c = data.classification;
+      return {
+        primary: {
+          intent: c.primary.intent,
+          confidence: c.primary.confidence,
+        },
+        secondary: c.secondary || [],
+        people: c.people || [],
+        teams: c.teams || [],
+        topics: c.topics || [],
+        systems: c.systems || [],
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error("Failed to classify signal:", err);
+    return null;
+  }
+}
 
 export function usePipeline() {
   const [apiLive, setApiLive] = useState<boolean | null>(null);
@@ -65,9 +99,24 @@ export function usePipeline() {
         setPipelineData(defaultPipeline);
         return;
       }
-      if (apiLive) {
-        setIsProcessing(true);
-        try {
+
+      setIsProcessing(true);
+      
+      try {
+        // Always try AI classification first (works with Lovable Cloud)
+        const aiClassification = await classifySignalWithAI(signal);
+        
+        if (aiClassification) {
+          setPipelineData({
+            classification: aiClassification,
+            graphBefore: mockGraphBefore,
+            graphAfter: mockGraphAfter,
+            truthVersions: mockTruthVersions,
+            conflicts: mockConflicts,
+            actions: mockActions,
+          });
+        } else if (apiLive) {
+          // Fallback to backend API if available
           const res = await api.process(signal.id);
           setPipelineData({
             classification: res.classification,
@@ -77,13 +126,24 @@ export function usePipeline() {
             conflicts: res.conflicts || [],
             actions: res.actions || [],
           });
-        } catch {
-          setPipelineData(defaultPipeline);
-        } finally {
-          setIsProcessing(false);
+        } else {
+          // Fallback to mock data
+          setPipelineData({
+            ...defaultPipeline,
+            classification: mockClassification,
+            truthVersions: mockTruthVersions,
+            conflicts: mockConflicts,
+            actions: mockActions,
+          });
         }
-      } else {
-        setPipelineData(defaultPipeline);
+      } catch (err) {
+        console.error("Pipeline processing error:", err);
+        setPipelineData({
+          ...defaultPipeline,
+          classification: mockClassification,
+        });
+      } finally {
+        setIsProcessing(false);
       }
     },
     [apiLive]
