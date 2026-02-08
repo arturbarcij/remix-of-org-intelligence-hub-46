@@ -17,8 +17,10 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
   const [desiredListening, setDesiredListening] = useState(false);
   const transcriptRef = useRef("");
   const fallbackTimerRef = useRef<number | null>(null);
+  const fallbackNoResultRef = useRef<number | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fallbackActiveRef = useRef(false);
+  const lastTranscriptAtRef = useRef<number | null>(null);
 
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
@@ -50,6 +52,7 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
   const stopBrowserRecognition = useCallback(() => {
     if (recognitionRef.current && fallbackActiveRef.current) {
       fallbackActiveRef.current = false;
+      lastTranscriptAtRef.current = null;
       recognitionRef.current.onresult = null;
       recognitionRef.current.onerror = null;
       recognitionRef.current.onend = null;
@@ -65,6 +68,7 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
       const last = event.results[event.results.length - 1];
       const transcript = last?.[0]?.transcript?.trim() || "";
       if (!transcript) return;
+      lastTranscriptAtRef.current = Date.now();
       if (last.isFinal) {
         onTranscript(transcript);
         onPartial?.("");
@@ -76,8 +80,12 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
       onPartial?.("");
     };
     recognition.onend = () => {
-      if (fallbackActiveRef.current && desiredListening) {
+      if (!fallbackActiveRef.current || !desiredListening) return;
+      const lastAt = lastTranscriptAtRef.current;
+      if (lastAt && Date.now() - lastAt < 5000) {
         recognition.start();
+      } else {
+        fallbackActiveRef.current = false;
       }
     };
     recognition.start();
@@ -88,6 +96,9 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
     return () => {
       if (fallbackTimerRef.current) {
         window.clearTimeout(fallbackTimerRef.current);
+      }
+      if (fallbackNoResultRef.current) {
+        window.clearTimeout(fallbackNoResultRef.current);
       }
       stopBrowserRecognition();
       if (scribe.isConnected) {
@@ -121,8 +132,6 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
       console.error("Voice input error:", err);
       setError(err instanceof Error ? err.message : "Voice input failed");
       setIsProcessing(false);
-      setDesiredListening(false);
-      startBrowserRecognition();
     }
   }, [scribe, startBrowserRecognition, stopBrowserRecognition]);
 
@@ -139,14 +148,15 @@ export default function VoiceInput({ onTranscript, onPartial, className = "", di
     } else {
       // Start listening
       setDesiredListening(true);
-      if (fallbackTimerRef.current) {
-        window.clearTimeout(fallbackTimerRef.current);
-      }
-      fallbackTimerRef.current = window.setTimeout(() => {
-        if (!scribe.isConnected) {
-          startBrowserRecognition();
+      startBrowserRecognition();
+      if (fallbackTimerRef.current) window.clearTimeout(fallbackTimerRef.current);
+      if (fallbackNoResultRef.current) window.clearTimeout(fallbackNoResultRef.current);
+      fallbackNoResultRef.current = window.setTimeout(() => {
+        if (!lastTranscriptAtRef.current) {
+          setError("Mic permission required");
+          stopBrowserRecognition();
         }
-      }, 800);
+      }, 3000);
       await connectScribe();
     }
   }, [disabled, scribe, connectScribe, startBrowserRecognition, stopBrowserRecognition]);
