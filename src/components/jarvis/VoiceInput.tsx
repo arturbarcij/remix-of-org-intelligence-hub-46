@@ -6,11 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void | Promise<unknown>;
+  onPartial?: (text: string) => void;
   className?: string;
   disabled?: boolean;
 }
 
-export default function VoiceInput({ onTranscript, className = "", disabled = false }: VoiceInputProps) {
+export default function VoiceInput({ onTranscript, onPartial, className = "", disabled = false }: VoiceInputProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const transcriptRef = useRef("");
@@ -20,6 +21,7 @@ export default function VoiceInput({ onTranscript, className = "", disabled = fa
     commitStrategy: CommitStrategy.VAD,
     onPartialTranscript: (data) => {
       transcriptRef.current = data.text;
+      onPartial?.(data.text);
     },
     onCommittedTranscript: (data) => {
       if (data.text.trim()) {
