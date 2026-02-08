@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useScribe, CommitStrategy } from "@elevenlabs/react";
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void | Promise<unknown>;
@@ -8,74 +9,87 @@ interface VoiceInputProps {
   disabled?: boolean;
 }
 
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: unknown) => void) | null;
-  onerror: ((event: unknown) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
 export default function VoiceInput({ onTranscript, className = "", disabled = false }: VoiceInputProps) {
-  const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const supportsSpeech = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const transcriptRef = useRef("");
 
-  useEffect(() => {
-    const SpeechRecognition = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike })
-      .SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-US";
-      recognitionRef.current = recognition;
-      supportsSpeech.current = true;
-    }
-  }, []);
-
-  const handleVoiceClick = useCallback(() => {
-    if (disabled) return;
-    if (isListening) {
-      // Stop listening
-      setIsListening(false);
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    commitStrategy: CommitStrategy.VAD,
+    onPartialTranscript: (data) => {
+      transcriptRef.current = data.text;
+    },
+    onCommittedTranscript: (data) => {
+      if (data.text.trim()) {
+        onTranscript(data.text.trim());
       }
+    },
+  });
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (scribe.isConnected) {
+        scribe.disconnect();
+      }
+    };
+  }, [scribe]);
+
+  const handleVoiceClick = useCallback(async () => {
+    if (disabled) return;
+    setError(null);
+
+    if (scribe.isConnected) {
+      // Stop listening
+      scribe.disconnect();
+      setIsProcessing(false);
     } else {
       // Start listening
-      setIsListening(true);
-      if (supportsSpeech.current && recognitionRef.current) {
-        setIsProcessing(false);
-        recognitionRef.current.onresult = (event: unknown) => {
-          const e = event as { results?: { 0?: { 0?: { transcript?: string } } } };
-          const transcript = e?.results?.[0]?.[0]?.transcript?.trim() || "";
-          if (transcript) {
-            onTranscript(transcript);
+      setIsProcessing(true);
+      try {
+        // Fetch token from edge function
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-scribe-token`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
           }
-        };
-        recognitionRef.current.onerror = () => {
-          setIsListening(false);
-          setIsProcessing(false);
-        };
-        recognitionRef.current.onend = () => {
-          setIsListening(false);
-        };
-        recognitionRef.current.start();
-      } else {
-        setIsProcessing(true);
-        setTimeout(() => {
-          onTranscript("Captured voice input from browser.");
-          setIsProcessing(false);
-          setIsListening(false);
-        }, 1200);
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to get scribe token");
+        }
+
+        const data = await response.json();
+        if (!data?.token) {
+          throw new Error("No token received");
+        }
+
+        transcriptRef.current = "";
+
+        await scribe.connect({
+          token: data.token,
+          microphone: {
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        });
+
+        setIsProcessing(false);
+      } catch (err) {
+        console.error("Voice input error:", err);
+        setError(err instanceof Error ? err.message : "Voice input failed");
+        setIsProcessing(false);
       }
     }
-  }, [disabled, isListening, onTranscript]);
+  }, [disabled, scribe, onTranscript]);
+
+  const isListening = scribe.isConnected;
 
   return (
     <div className={`relative ${className}`}>
@@ -147,15 +161,31 @@ export default function VoiceInput({ onTranscript, className = "", disabled = fa
 
       {/* Status label */}
       <AnimatePresence>
-        {(isListening || isProcessing) && (
+        {(isListening || isProcessing || error) && (
           <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap"
           >
-            <span className="text-[10px] font-mono text-muted-foreground px-2 py-0.5 rounded-full bg-card border border-border">
-              {isProcessing ? "Processing..." : "Listening..."}
+            <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full bg-card border border-border ${error ? "text-intent-risk" : "text-muted-foreground"}`}>
+              {error ? "Error" : isProcessing ? "Connecting..." : "Listening..."}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Live transcript preview */}
+      <AnimatePresence>
+        {isListening && scribe.partialTranscript && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute top-full right-0 mt-8 max-w-xs"
+          >
+            <span className="text-[10px] font-mono text-muted-foreground/70 px-2 py-1 rounded bg-card/80 border border-border line-clamp-2">
+              {scribe.partialTranscript}
             </span>
           </motion.div>
         )}
