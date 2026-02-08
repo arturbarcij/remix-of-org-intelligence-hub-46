@@ -72,37 +72,37 @@ export default function StakeholderMap({ isVisible }: StakeholderMapProps) {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-4"
+      className="space-y-3 sm:space-y-4"
     >
       <motion.div variants={itemVariants}>
-        <h2 className="font-heading text-lg font-semibold text-foreground mb-1">Stakeholder Map</h2>
-        <p className="text-xs text-muted-foreground">Communication patterns and reachability</p>
+        <h2 className="font-heading text-base sm:text-lg font-semibold text-foreground mb-0.5 sm:mb-1">Stakeholder Map</h2>
+        <p className="text-[10px] sm:text-xs text-muted-foreground">Communication patterns and reachability</p>
       </motion.div>
 
-      {/* Stakeholder grid */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 gap-2">
+      {/* Stakeholder grid - single column on mobile */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 xs:grid-cols-2 gap-2">
         {stakeholders.map((stakeholder) => {
           const ChannelIcon = channelIcons[stakeholder.preferredChannel];
           return (
             <motion.div
               key={stakeholder.id}
               variants={itemVariants}
-              className="rounded-lg border border-border bg-card p-3"
+              className="rounded-lg border border-border bg-card p-2.5 sm:p-3"
             >
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <div className="text-xs font-medium text-foreground">{stakeholder.name}</div>
-                  <div className="text-[10px] text-muted-foreground">{stakeholder.role}</div>
+              <div className="flex items-start justify-between mb-1.5 sm:mb-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-medium text-foreground truncate">{stakeholder.name}</div>
+                  <div className="text-[9px] sm:text-[10px] text-muted-foreground truncate">{stakeholder.role}</div>
                 </div>
-                <div className="p-1 rounded bg-secondary">
+                <div className="p-1 rounded bg-secondary flex-shrink-0 ml-2">
                   <ChannelIcon className="w-3 h-3 text-muted-foreground" />
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className={`text-[10px] font-mono ${reachabilityColors[stakeholder.reachability]}`}>
-                  {stakeholder.reachability} reachability
+                <span className={`text-[9px] sm:text-[10px] font-mono ${reachabilityColors[stakeholder.reachability]}`}>
+                  {stakeholder.reachability}
                 </span>
-                <span className="text-[10px] text-muted-foreground">{stakeholder.lastContact}</span>
+                <span className="text-[9px] sm:text-[10px] text-muted-foreground">{stakeholder.lastContact}</span>
               </div>
             </motion.div>
           );
