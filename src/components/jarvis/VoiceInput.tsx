@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useScribe, CommitStrategy } from "@elevenlabs/react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void | Promise<unknown>;
@@ -48,24 +49,13 @@ export default function VoiceInput({ onTranscript, className = "", disabled = fa
       // Start listening
       setIsProcessing(true);
       try {
-        // Fetch token from edge function
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-scribe-token`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-          }
-        );
+        // Fetch token from edge function using supabase client
+        const { data, error: invokeError } = await supabase.functions.invoke("elevenlabs-scribe-token");
 
-        if (!response.ok) {
-          throw new Error("Failed to get scribe token");
+        if (invokeError) {
+          throw new Error(invokeError.message || "Failed to get scribe token");
         }
 
-        const data = await response.json();
         if (!data?.token) {
           throw new Error("No token received");
         }
